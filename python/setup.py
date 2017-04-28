@@ -21,15 +21,16 @@ setup(name='nitor-vault',
       author='Pasi Niemi',
       author_email='pasi@nitor.com',
       license='Apache 2.0',
-      packages=['vault'],
+      packages=['n_vault'],
       include_package_data=True,
       entry_points={
-          'console_scripts': ['vault=vault.cli:main'],
+          'console_scripts': ['vault=n_vault.cli:main'],
       },
       install_requires=[
           'boto3',
           'awscli',
           'pycrypto',
           'requests',
+          'argcomplete'
       ],
       zip_safe=False)
