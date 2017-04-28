@@ -14,10 +14,10 @@
 from setuptools import setup
   
 setup(name='vault',
-      version='0.1',
+      version='0.2',
       description='Vault for storing locally encypted data in S3 using KMS keys',
       url='http://github.com/NitorCreations/vault',
-      download_url='https://github.com/NitorCreations/vault/tarball/0.1',
+      download_url='https://github.com/NitorCreations/vault/tarball/0.2',
       author='Pasi Niemi',
       author_email='pasi@nitor.com',
       license='Apache 2.0',
