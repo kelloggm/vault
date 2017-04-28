@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from setuptools import setup
-  
+
 setup(name='nitor-vault',
       version='0.4',
       description='Vault for storing locally encypted data in S3 using KMS keys',
