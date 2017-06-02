@@ -19,6 +19,9 @@ public class VaultClient {
   private final AWSKMSClient kms;
   private final String bucketName;
 
+  private static final String VALUE_OBJECT_NAME_FORMAT = "%s.encrypted";
+  private static final String KEY_OBJECT_NAME_FORMAT = "%s.key";
+
   public VaultClient(AmazonS3Client s3, AWSKMSClient kms, String bucketName) {
     if (s3 == null) {
       throw new IllegalArgumentException("S3 client is needed");
@@ -37,8 +40,8 @@ public class VaultClient {
   public String lookup(String name) throws VaultException {
     final byte[] encrypted, key;
     try {
-      encrypted = readObject(name + ".encrypted");
-      key = readObject(name + ".key");
+      encrypted = readObject(encyptedValueObjectName(name));
+      key = readObject(keyObjectName(name));
     } catch (IOException e) {
       throw new IllegalStateException(String.format("Could not read secret %s from vault", name), e);
     }
@@ -50,6 +53,14 @@ public class VaultClient {
     } catch (GeneralSecurityException e) {
       throw new VaultException(String.format("Unable to decrypt secret %s", name), e);
     }
+  }
+
+  private static String encyptedValueObjectName(String name) {
+    return String.format(VALUE_OBJECT_NAME_FORMAT, name);
+  }
+
+  private static String keyObjectName(String name) {
+    return String.format(KEY_OBJECT_NAME_FORMAT, name);
   }
 
   private byte[] decrypt(byte[] encrypted, ByteBuffer decryptedKey) throws GeneralSecurityException {
