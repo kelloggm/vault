@@ -3,6 +3,8 @@ package com.nitorcreations.vault;
 import com.amazonaws.services.kms.AWSKMSClient;
 import com.amazonaws.services.kms.model.DecryptRequest;
 import com.amazonaws.services.kms.model.DecryptResult;
+import com.amazonaws.services.kms.model.GenerateDataKeyRequest;
+import com.amazonaws.services.kms.model.GenerateDataKeyResult;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
@@ -31,6 +33,8 @@ public class VaultClientTest {
   private static final String BUCKET_NAME_FIXTURE = "bucket";
   private static final String SECRET_NAME_FIXTURE = "foo";
   private static final String KEY_FIXTURE = "key";
+  private static final String VAULT_KEY_FIXTURE = "vaultKey";
+  private static final String DATA_FIXTURE = "data";
 
   private AmazonS3Client s3Mock;
   private AWSKMSClient kmsMock;
@@ -42,19 +46,19 @@ public class VaultClientTest {
   @Test
   public void constructorThrowsIaeWhenS3Null() {
     expectedException.expect(IllegalArgumentException.class);
-    new VaultClient(null, new AWSKMSClient(), BUCKET_NAME_FIXTURE);
+    new VaultClient(null, new AWSKMSClient(), BUCKET_NAME_FIXTURE, VAULT_KEY_FIXTURE);
   }
 
   @Test
   public void constructorThrowsIaeWhenKmsNull() {
     expectedException.expect(IllegalArgumentException.class);
-    new VaultClient(new AmazonS3Client(), null, BUCKET_NAME_FIXTURE);
+    new VaultClient(new AmazonS3Client(), null, BUCKET_NAME_FIXTURE, VAULT_KEY_FIXTURE);
   }
 
   @Test
   public void constructorThrowsIaeWhenBucketNameNull() {
     expectedException.expect(IllegalArgumentException.class);
-    new VaultClient(new AmazonS3Client(), new AWSKMSClient(), null);
+    new VaultClient(new AmazonS3Client(), new AWSKMSClient(), null, VAULT_KEY_FIXTURE);
   }
 
   @Before
@@ -67,17 +71,16 @@ public class VaultClientTest {
   public void setUpKms() {
     kmsMock = mock(AWSKMSClient.class);
     when(kmsMock.decrypt(any(DecryptRequest.class))).thenReturn(createDecryptResult());
+    when(kmsMock.generateDataKey(any(GenerateDataKeyRequest.class))).thenReturn(createGenerateDataKeyResult());
   }
 
   @Before
   public void setUpVaultClient() {
-    vaultClient = new VaultClient(s3Mock, kmsMock, BUCKET_NAME_FIXTURE);
+    vaultClient = new VaultClient(s3Mock, kmsMock, BUCKET_NAME_FIXTURE, VAULT_KEY_FIXTURE);
   }
 
   private static DecryptResult createDecryptResult() {
-    final byte[] bytes = new byte[16];
-    new Random().nextBytes(bytes);
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    ByteBuffer byteBuffer = randomBuffer();
     return new DecryptResult().withPlaintext(byteBuffer);
   }
 
@@ -85,6 +88,10 @@ public class VaultClientTest {
     final S3Object s3Object = new S3Object();
     s3Object.setObjectContent(IOUtils.toInputStream(content, "UTF-8"));
     return s3Object;
+  }
+
+  private static GenerateDataKeyResult createGenerateDataKeyResult() {
+    return new GenerateDataKeyResult().withPlaintext(randomBuffer()).withCiphertextBlob(randomBuffer());
   }
 
   @Test
@@ -109,5 +116,35 @@ public class VaultClientTest {
   public void lookupDecryptsSecretUsingKms() throws Exception {
     vaultClient.lookup(SECRET_NAME_FIXTURE);
     verify(kmsMock).decrypt(any());
+  }
+
+  @Test
+  public void storeWritesEncryptedValueToS3() throws Exception {
+    vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE);
+    verify(s3Mock).putObject(argThat(putObjectRequest -> (SECRET_NAME_FIXTURE + ".encrypted").equals(putObjectRequest.getKey())));
+  }
+
+  @Test
+  public void storeWritesEncryptionKeyToS3() throws Exception {
+    vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE);
+    verify(s3Mock).putObject(argThat(putObjectRequest -> (SECRET_NAME_FIXTURE + ".key").equals(putObjectRequest.getKey())));
+  }
+
+  @Test
+  public void storeWritesKeyAndValueToCorrectBucket() throws Exception {
+    vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE);
+    verify(s3Mock, times(2)).putObject(argThat(putObjectRequest -> BUCKET_NAME_FIXTURE.equals(putObjectRequest.getBucketName())));
+  }
+
+  @Test
+  public void storeEncryptsValueUsingTheCorrectVaultKey() throws Exception {
+    vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE);
+    verify(kmsMock).generateDataKey(argThat(generateDataKeyRequest -> VAULT_KEY_FIXTURE.equals(generateDataKeyRequest.getKeyId())));
+  }
+
+  private static ByteBuffer randomBuffer() {
+    final byte[] bytes = new byte[16];
+    new Random().nextBytes(bytes);
+    return ByteBuffer.wrap(bytes);
   }
 }
