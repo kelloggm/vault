@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -140,6 +142,13 @@ public class VaultClientTest {
   public void storeEncryptsValueUsingTheCorrectVaultKey() throws Exception {
     vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE);
     verify(kmsMock).generateDataKey(argThat(generateDataKeyRequest -> VAULT_KEY_FIXTURE.equals(generateDataKeyRequest.getKeyId())));
+  }
+
+  @Test
+  public void existsReturnsCorrectResult() {
+    final boolean expectedReturnValue = true;
+    when(s3Mock.doesObjectExist(BUCKET_NAME_FIXTURE, SECRET_NAME_FIXTURE + ".key")).thenReturn(expectedReturnValue);
+    assertThat(vaultClient.exists(SECRET_NAME_FIXTURE), is(expectedReturnValue));
   }
 
   private static ByteBuffer randomBuffer() {

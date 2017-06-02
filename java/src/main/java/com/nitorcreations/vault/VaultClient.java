@@ -78,6 +78,10 @@ public class VaultClient {
     writeObject(encyptedValueObjectName(name), encrypted.getValue());
   }
 
+  public boolean exists(String name) {
+    return this.s3.doesObjectExist(this.bucketName, keyObjectName(name));
+  }
+
   private static String encyptedValueObjectName(String name) {
     return String.format(VALUE_OBJECT_NAME_FORMAT, name);
   }
