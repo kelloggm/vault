@@ -7,7 +7,9 @@ import com.amazonaws.services.kms.model.GenerateDataKeyRequest;
 import com.amazonaws.services.kms.model.GenerateDataKeyResult;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.apache.commons.io.IOUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -20,6 +22,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import static java.util.Arrays.asList;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,6 +71,17 @@ public class VaultClientTest {
   public void setUpS3() throws Exception {
     s3Mock = mock(AmazonS3Client.class);
     when(s3Mock.getObject(any(GetObjectRequest.class))).thenReturn(createS3Object("value"), createS3Object(KEY_FIXTURE));
+  }
+
+  @Before
+  public void setUpObjectListing() {
+    ObjectListing mockObjectListing = mock(ObjectListing.class);
+    final S3ObjectSummary valueObjectSummary = new S3ObjectSummary();
+    valueObjectSummary.setKey(SECRET_NAME_FIXTURE + ".encrypted");
+    final S3ObjectSummary keyObjectSummary = new S3ObjectSummary();
+    keyObjectSummary.setKey(SECRET_NAME_FIXTURE + ".key");
+    when(mockObjectListing.getObjectSummaries()).thenReturn(asList(valueObjectSummary, keyObjectSummary));
+    when(s3Mock.listObjects(BUCKET_NAME_FIXTURE)).thenReturn(mockObjectListing);
   }
 
   @Before
@@ -167,6 +182,16 @@ public class VaultClientTest {
   public void deleteRemovesKeyAndValueFromCorrectBucket() {
     vaultClient.delete(SECRET_NAME_FIXTURE);
     verify(s3Mock, times(2)).deleteObject(argThat(deleteObjectRequest -> BUCKET_NAME_FIXTURE.equals(deleteObjectRequest.getBucketName())));
+  }
+
+  @Test
+  public void allReturnsCorrectNumberOfNames() {
+    assertThat(vaultClient.all().size(), is(1));
+  }
+
+  @Test
+  public void allReturnsCorrectName() {
+    assertThat(vaultClient.all().get(0), is(equalTo(SECRET_NAME_FIXTURE)));
   }
 
   private static ByteBuffer randomBuffer() {

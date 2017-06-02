@@ -8,6 +8,7 @@ import com.amazonaws.services.kms.model.GenerateDataKeyResult;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.IOUtils;
@@ -20,9 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.AbstractMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.amazonaws.services.s3.model.CannedAccessControlList.Private;
+import static java.util.stream.Collectors.toList;
 
 public class VaultClient {
 
@@ -31,7 +34,8 @@ public class VaultClient {
   private final String bucketName;
   private final String vaultKey;
 
-  private static final String VALUE_OBJECT_NAME_FORMAT = "%s.encrypted";
+  private static final String VALUE_OBJECT_SUFFIX = "encrypted";
+  private static final String VALUE_OBJECT_NAME_FORMAT = "%s.%s";
   private static final String KEY_OBJECT_NAME_FORMAT = "%s.key";
 
   public VaultClient(AmazonS3Client s3, AWSKMSClient kms, String bucketName, String vaultKey) {
@@ -88,8 +92,15 @@ public class VaultClient {
     deleteObject(encyptedValueObjectName(name));
   }
 
+  public List<String> all() {
+    return this.s3.listObjects(this.bucketName).getObjectSummaries().stream()
+        .filter(object -> object.getKey().endsWith(VALUE_OBJECT_SUFFIX))
+        .map(object -> object.getKey().substring(0, object.getKey().length() - (VALUE_OBJECT_SUFFIX.length() + 1)))
+        .collect(toList());
+  }
+
   private static String encyptedValueObjectName(String name) {
-    return String.format(VALUE_OBJECT_NAME_FORMAT, name);
+    return String.format(VALUE_OBJECT_NAME_FORMAT, name, VALUE_OBJECT_SUFFIX);
   }
 
   private static String keyObjectName(String name) {
