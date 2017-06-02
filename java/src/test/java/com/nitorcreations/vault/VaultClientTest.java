@@ -75,12 +75,10 @@ public class VaultClientTest {
   }
 
   private static DecryptResult createDecryptResult() {
-    DecryptResult result = new DecryptResult();
     final byte[] bytes = new byte[16];
     new Random().nextBytes(bytes);
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    result.setPlaintext(byteBuffer);
-    return result;
+    return new DecryptResult().withPlaintext(byteBuffer);
   }
 
   private static S3Object createS3Object(final String content) throws IOException {
