@@ -151,6 +151,24 @@ public class VaultClientTest {
     assertThat(vaultClient.exists(SECRET_NAME_FIXTURE), is(expectedReturnValue));
   }
 
+  @Test
+  public void deleteRemovesKeyFromS3() {
+    vaultClient.delete(SECRET_NAME_FIXTURE);
+    verify(s3Mock).deleteObject(argThat(deleteObjectRequest -> (SECRET_NAME_FIXTURE + ".key").equals(deleteObjectRequest.getKey())));
+  }
+
+  @Test
+  public void deleteRemovesEncryptedValueFromS3() {
+    vaultClient.delete(SECRET_NAME_FIXTURE);
+    verify(s3Mock).deleteObject(argThat(deleteObjectRequest -> (SECRET_NAME_FIXTURE + ".encrypted").equals(deleteObjectRequest.getKey())));
+  }
+
+  @Test
+  public void deleteRemovesKeyAndValueFromCorrectBucket() {
+    vaultClient.delete(SECRET_NAME_FIXTURE);
+    verify(s3Mock, times(2)).deleteObject(argThat(deleteObjectRequest -> BUCKET_NAME_FIXTURE.equals(deleteObjectRequest.getBucketName())));
+  }
+
   private static ByteBuffer randomBuffer() {
     final byte[] bytes = new byte[16];
     new Random().nextBytes(bytes);

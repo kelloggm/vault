@@ -6,6 +6,7 @@ import com.amazonaws.services.kms.model.DecryptRequest;
 import com.amazonaws.services.kms.model.GenerateDataKeyRequest;
 import com.amazonaws.services.kms.model.GenerateDataKeyResult;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
@@ -82,6 +83,11 @@ public class VaultClient {
     return this.s3.doesObjectExist(this.bucketName, keyObjectName(name));
   }
 
+  public void delete(String name) {
+    deleteObject(keyObjectName(name));
+    deleteObject(encyptedValueObjectName(name));
+  }
+
   private static String encyptedValueObjectName(String name) {
     return String.format(VALUE_OBJECT_NAME_FORMAT, name);
   }
@@ -118,5 +124,9 @@ public class VaultClient {
 
   private byte[] readObject(String key) throws IOException {
     return IOUtils.toByteArray(this.s3.getObject(new GetObjectRequest(this.bucketName, key)).getObjectContent());
+  }
+
+  private void deleteObject(String key) {
+    this.s3.deleteObject(new DeleteObjectRequest(this.bucketName, key));
   }
 }
