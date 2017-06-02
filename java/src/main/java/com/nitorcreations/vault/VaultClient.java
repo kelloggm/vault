@@ -53,12 +53,15 @@ public class VaultClient {
   }
 
   private byte[] decrypt(byte[] encrypted, ByteBuffer decryptedKey) throws GeneralSecurityException {
-    final SecretKeySpec keyForDecrypting = new SecretKeySpec(decryptedKey.array(), "AES");
+    return createCipher(decryptedKey, Cipher.DECRYPT_MODE).doFinal(encrypted);
+  }
+
+  private static Cipher createCipher(final ByteBuffer unencryptedKey, final int encryptMode) throws GeneralSecurityException {
     final byte[] iv = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1337 / 256, 1337 % 256 };
     final Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 
-    cipher.init(Cipher.DECRYPT_MODE, keyForDecrypting, new IvParameterSpec(iv));
-    return cipher.doFinal(encrypted);
+    cipher.init(encryptMode, new SecretKeySpec(unencryptedKey.array(), "AES"), new IvParameterSpec(iv));
+    return cipher;
   }
 
   private byte[] readObject(String key) throws IOException {
