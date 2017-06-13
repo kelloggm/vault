@@ -1,10 +1,10 @@
 const AWS = require('aws-sdk');
 const crypto = require('crypto');
 
-const ALGORITHMS = {
+const ALGORITHMS = Object.freeze({
   crypto: 'AES-256-CTR',
   kms: 'AES_256'
-};
+});
 const STATIC_IV = new Buffer([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1337 / 256, 1337 % 256]);
 const ENCODING = 'UTF-8';
 
