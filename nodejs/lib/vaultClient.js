@@ -61,7 +61,15 @@ createVaultClient = (options) => {
     exists: (name) => s3.headObject(createEncryptedValueRequestObject(bucketName, name)).promise().then(
       () => Promise.resolve(true),
       () => Promise.resolve(false)
-    )
+    ),
+
+    all: () => s3.listObjectsV2({
+      Bucket: bucketName
+    }).promise().then((data) => {
+      return Promise.resolve(data.Contents
+        .filter((object) => object.Key.endsWith('.encrypted'))
+        .map(object => object.Key.slice(0, -('.encrypted'.length))));
+    })
   }
 };
 

@@ -18,11 +18,13 @@ describe('VaultClient', () => {
   const putObjectSpy = sinon.stub();
   const generateDataKeySpy = sinon.stub();
   const headObjectSpy = sinon.stub();
+  const listObjectsSpy = sinon.stub();
 
   before(() => {
     AWS.mock('S3', 'getObject', getObjectSpy);
     AWS.mock('S3', 'putObject', putObjectSpy);
     AWS.mock('S3', 'headObject', headObjectSpy);
+    AWS.mock('S3', 'listObjectsV2', listObjectsSpy);
     AWS.mock('KMS', 'decrypt', decryptSpy);
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
   });
@@ -172,5 +174,38 @@ describe('VaultClient', () => {
           });
       });
     });
+  });
+
+  describe('all', () => {
+    beforeEach(() => {
+      listObjectsSpy.yields(null, { Contents: [
+        {
+          Key: 'first.encrypted'
+        },
+        {
+          Key: 'second.key'
+        },
+        {
+          Key: 'second.encrypted'
+        },
+        {
+          Key: 'first.key'
+        }
+      ]});
+
+      vaultClient = VaultClient({
+        bucketName: BUCKET_NAME_FIXTURE,
+        vaultKey: VAULT_KEY_FIXTURE
+      });
+    });
+
+    it('resolves to an Array of names', () => vaultClient.all().then(all => all.should.be.an.Array()));
+
+    it('resolves to an Array of correct size', () => vaultClient.all().then(all => all.should.have.property('length', 2)));
+
+    it('resolves to an Array with correct names', () => vaultClient.all().then(all => {
+      all.should.containEql('first');
+      all.should.containEql('second');
+    }))
   });
 });
