@@ -11,7 +11,7 @@
   ],
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/_mocha"
+    "test": "mocha"
   },
   "dependencies": {
     "aws-sdk": "2.61.0"
