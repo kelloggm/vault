@@ -56,8 +56,12 @@ createVaultClient = (options) => {
         writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key).promise(),
         writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value).promise()
       ]);
-    })
+    }),
 
+    exists: (name) => s3.headObject(createEncryptedValueRequestObject(bucketName, name)).promise().then(
+      () => Promise.resolve(true),
+      () => Promise.resolve(false)
+    )
   }
 };
 

@@ -17,10 +17,12 @@ describe('VaultClient', () => {
   const decryptSpy = sinon.stub();
   const putObjectSpy = sinon.stub();
   const generateDataKeySpy = sinon.stub();
+  const headObjectSpy = sinon.stub();
 
   before(() => {
     AWS.mock('S3', 'getObject', getObjectSpy);
     AWS.mock('S3', 'putObject', putObjectSpy);
+    AWS.mock('S3', 'headObject', headObjectSpy);
     AWS.mock('KMS', 'decrypt', decryptSpy);
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
   });
@@ -134,6 +136,41 @@ describe('VaultClient', () => {
         .then(() => {
           generateDataKeySpy.should.have.been.calledWithMatch({ KeyId: VAULT_KEY_FIXTURE });
         });
+    });
+  });
+
+  describe('exists', () => {
+    beforeEach(() => {
+      vaultClient = VaultClient({
+        bucketName: BUCKET_NAME_FIXTURE,
+        vaultKey: VAULT_KEY_FIXTURE
+      });
+    });
+
+    describe('when object exists' , () => {
+      beforeEach(() => {
+        headObjectSpy.yields(null, {});
+      });
+
+      it('resolves to true', () => {
+        return vaultClient.exists(SECRET_NAME_FIXTURE)
+          .then((exists) => {
+            exists.should.be.true();
+          });
+      });
+    });
+
+    describe('when object does not exist', () => {
+      beforeEach(() => {
+        headObjectSpy.yields({});
+      });
+
+      it('resolves to false', () => {
+        return vaultClient.exists(SECRET_NAME_FIXTURE)
+          .then((exists) => {
+            exists.should.be.false();
+          });
+      });
     });
   });
 });
