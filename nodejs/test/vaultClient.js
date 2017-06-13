@@ -62,39 +62,20 @@ describe('VaultClient', () => {
       decryptSpy.reset();
     });
 
-    it('reads encrypted value from S3', () => {
-      return vaultClient.lookup(SECRET_NAME_FIXTURE)
-        .then(() => {
-          getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.encrypted' });
-        });
-    });
+    it('reads encrypted value from S3', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
+      .then(() => getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.encrypted' })));
 
-    it('reads encrypted key from S3', () => {
-      return vaultClient.lookup(SECRET_NAME_FIXTURE)
-        .then(() => {
-          getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.key' });
-        });
-    });
+    it('reads encrypted key from S3', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
+      .then(() => getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.key' })));
 
-    it('reads encrypted key and value from the correct bucket', () => {
-      return vaultClient.lookup(SECRET_NAME_FIXTURE)
-        .then(() => {
-          getObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE });
-        });
-    });
+    it('reads encrypted key and value from the correct bucket', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
+      .then(() => getObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE })));
 
-    it('decrypts the encrypted key using KMS', () => {
-      return vaultClient.lookup(SECRET_NAME_FIXTURE)
-        .then(() => {
-          decryptSpy.should.have.been.calledWithMatch({ CiphertextBlob: ENCRYPTED_KEY_FIXTURE });
-        });
-    });
+    it('decrypts the encrypted key using KMS', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
+      .then(() => decryptSpy.should.have.been.calledWithMatch({ CiphertextBlob: ENCRYPTED_KEY_FIXTURE })));
 
-    it('resolves to a string promise', () => {
-      return vaultClient.lookup(SECRET_NAME_FIXTURE).then((result) => {
-        result.should.be.a.String();
-      });
-    });
+    it('resolves to a string promise', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
+      .then((result) => result.should.be.a.String()));
   });
 
   describe('store', () => {
@@ -112,33 +93,17 @@ describe('VaultClient', () => {
       });
     });
 
-    it('Writes encrypted value to S3', () => {
-      return vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-        .then(() => {
-          putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".encrypted" });
-        });
-    });
+    it('Writes encrypted value to S3', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
+      .then(() => putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".encrypted" })));
 
-    it('Writes encryption key to S3', () => {
-      return vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-        .then(() => {
-          putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".key" });
-        });
-    });
+    it('Writes encryption key to S3', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
+      .then(() => putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".key" })));
 
-    it('Writes key and value to correct bucket', () => {
-      return vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-        .then(() => {
-          putObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE });
-        });
-    });
+    it('Writes key and value to correct bucket', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
+      .then(() => putObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE })));
 
-    it('Encrypts value using the correct vault key', () => {
-      return vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-        .then(() => {
-          generateDataKeySpy.should.have.been.calledWithMatch({ KeyId: VAULT_KEY_FIXTURE });
-        });
-    });
+    it('Encrypts value using the correct vault key', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
+      .then(() => generateDataKeySpy.should.have.been.calledWithMatch({ KeyId: VAULT_KEY_FIXTURE })));
   });
 
   describe('exists', () => {
@@ -150,9 +115,7 @@ describe('VaultClient', () => {
     });
 
     describe('when object exists' , () => {
-      beforeEach(() => {
-        headObjectSpy.yields(null, {});
-      });
+      beforeEach(() => headObjectSpy.yields(null, {}));
 
       it('resolves to true', () => {
         return vaultClient.exists(SECRET_NAME_FIXTURE)
@@ -163,9 +126,7 @@ describe('VaultClient', () => {
     });
 
     describe('when object does not exist', () => {
-      beforeEach(() => {
-        headObjectSpy.yields({});
-      });
+      beforeEach(() => headObjectSpy.yields({}));
 
       it('resolves to false', () => {
         return vaultClient.exists(SECRET_NAME_FIXTURE)
