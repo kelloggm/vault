@@ -32,5 +32,6 @@
   },
   "bugs": {
     "url": "http://github.com/NitorCreations/vault/issues"
-  }
+  },
+  "license": "Apache-2.0"
 }
