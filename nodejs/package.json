@@ -29,5 +29,8 @@
   "repository": {
     "type": "git",
     "url": "git://github.com/NitorCreations/vault"
+  },
+  "bugs": {
+    "url": "http://github.com/NitorCreations/vault/issues"
   }
 }
