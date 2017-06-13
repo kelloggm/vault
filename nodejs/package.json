@@ -1,6 +1,7 @@
 {
   "name": "@nitor/aws-vault",
   "version": "0.0.0",
+  "main": "index.js",
   "scripts": {
     "test": "./node_modules/.bin/_mocha"
   },
