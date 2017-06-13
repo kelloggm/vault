@@ -25,48 +25,39 @@ describe('VaultClient', () => {
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
   });
 
-  beforeEach(() => {
-    getObjectSpy
-      .onCall(0)
-      .yields(null, ENCRYPTED_KEY_FIXTURE)
-      .onCall(1)
-      .yields(null, 'foo');
-
-    putObjectSpy.yields();
-
-    decryptSpy.yields(null, {
-      Plaintext: crypto.randomBytes(32)
-    });
-
-    generateDataKeySpy.yields(null, {
-      Plaintext: crypto.randomBytes(32),
-      CiphertextBlob: crypto.randomBytes(32)
-    });
-
-    vaultClient = VaultClient({
-      bucketName: BUCKET_NAME_FIXTURE,
-      vaultKey: VAULT_KEY_FIXTURE
-    });
-  });
-
-  afterEach(() => {
-    getObjectSpy.reset();
-    putObjectSpy.reset();
-    decryptSpy.reset();
-    generateDataKeySpy.reset();
-  });
-
   after(() => {
     AWS.restore();
   });
 
   describe('factory', () => {
     it('returns an object', () => {
-      vaultClient.should.be.an.Object();
+      VaultClient({}).should.be.an.Object();
     });
   });
 
   describe('lookup', () => {
+    beforeEach(() => {
+      getObjectSpy
+        .onCall(0)
+        .yields(null, ENCRYPTED_KEY_FIXTURE)
+        .onCall(1)
+        .yields(null, 'foo');
+
+      decryptSpy.yields(null, {
+        Plaintext: crypto.randomBytes(32)
+      });
+
+      vaultClient = VaultClient({
+        bucketName: BUCKET_NAME_FIXTURE,
+        vaultKey: VAULT_KEY_FIXTURE
+      });
+    });
+
+    afterEach(() => {
+      getObjectSpy.reset();
+      decryptSpy.reset();
+    });
+
     it('reads encrypted value from S3', () => {
       return vaultClient.lookup(SECRET_NAME_FIXTURE)
         .then(() => {
@@ -103,6 +94,20 @@ describe('VaultClient', () => {
   });
 
   describe('store', () => {
+    beforeEach(() => {
+      putObjectSpy.yields();
+
+      generateDataKeySpy.yields(null, {
+        Plaintext: crypto.randomBytes(32),
+        CiphertextBlob: crypto.randomBytes(32)
+      });
+
+      vaultClient = VaultClient({
+        bucketName: BUCKET_NAME_FIXTURE,
+        vaultKey: VAULT_KEY_FIXTURE
+      });
+    });
+
     it('Writes encrypted value to S3', () => {
       return vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
         .then(() => {
