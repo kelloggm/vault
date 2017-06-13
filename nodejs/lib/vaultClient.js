@@ -58,6 +58,11 @@ createVaultClient = (options) => {
       ]);
     }),
 
+    delete: (name) => Promise.all([
+      s3.deleteObject(createEncryptedValueRequestObject(bucketName, name)).promise(),
+      s3.deleteObject(createKeyRequestObject(bucketName, name)).promise()
+    ]),
+
     exists: (name) => s3.headObject(createEncryptedValueRequestObject(bucketName, name)).promise().then(
       () => Promise.resolve(true),
       () => Promise.resolve(false)

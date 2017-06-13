@@ -19,12 +19,14 @@ describe('VaultClient', () => {
   const generateDataKeySpy = sinon.stub();
   const headObjectSpy = sinon.stub();
   const listObjectsSpy = sinon.stub();
+  const deleteObjectSpy = sinon.stub();
 
   before(() => {
     AWS.mock('S3', 'getObject', getObjectSpy);
     AWS.mock('S3', 'putObject', putObjectSpy);
     AWS.mock('S3', 'headObject', headObjectSpy);
     AWS.mock('S3', 'listObjectsV2', listObjectsSpy);
+    AWS.mock('S3', 'deleteObject', deleteObjectSpy);
     AWS.mock('KMS', 'decrypt', decryptSpy);
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
   });
@@ -153,5 +155,26 @@ describe('VaultClient', () => {
       all.should.containEql('first');
       all.should.containEql('second');
     }))
+  });
+
+  describe('delete', () => {
+    beforeEach(() => {
+      deleteObjectSpy.yields(null, {});
+    });
+
+    it('deletes the encrypted value from S3', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
+      .then(() => deleteObjectSpy.should.have.been.calledWithMatch({
+        Key: ENCRYPTED_KEY_FIXTURE + '.encrypted'
+      })));
+
+    it('deletes the key from S3', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
+      .then(() => deleteObjectSpy.should.have.been.calledWithMatch({
+        Key: ENCRYPTED_KEY_FIXTURE + '.key'
+      })));
+
+    it('deletes the value and the key from the correct bucket', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
+      .then(() => deleteObjectSpy.should.have.been.alwaysCalledWithMatch({
+        Bucket: BUCKET_NAME_FIXTURE
+      })));
   });
 });
