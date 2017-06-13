@@ -29,13 +29,20 @@ describe('VaultClient', () => {
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
   });
 
+  beforeEach(() => {
+    vaultClient = VaultClient({
+      bucketName: BUCKET_NAME_FIXTURE,
+      vaultKey: VAULT_KEY_FIXTURE
+    });
+  });
+
   after(() => {
     AWS.restore();
   });
 
   describe('factory', () => {
     it('returns an object', () => {
-      VaultClient({}).should.be.an.Object();
+      vaultClient.should.be.an.Object();
     });
   });
 
@@ -49,11 +56,6 @@ describe('VaultClient', () => {
 
       decryptSpy.yields(null, {
         Plaintext: crypto.randomBytes(32)
-      });
-
-      vaultClient = VaultClient({
-        bucketName: BUCKET_NAME_FIXTURE,
-        vaultKey: VAULT_KEY_FIXTURE
       });
     });
 
@@ -86,11 +88,6 @@ describe('VaultClient', () => {
         Plaintext: crypto.randomBytes(32),
         CiphertextBlob: crypto.randomBytes(32)
       });
-
-      vaultClient = VaultClient({
-        bucketName: BUCKET_NAME_FIXTURE,
-        vaultKey: VAULT_KEY_FIXTURE
-      });
     });
 
     it('Writes encrypted value to S3', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
@@ -107,13 +104,6 @@ describe('VaultClient', () => {
   });
 
   describe('exists', () => {
-    beforeEach(() => {
-      vaultClient = VaultClient({
-        bucketName: BUCKET_NAME_FIXTURE,
-        vaultKey: VAULT_KEY_FIXTURE
-      });
-    });
-
     describe('when object exists' , () => {
       beforeEach(() => headObjectSpy.yields(null, {}));
 
@@ -153,11 +143,6 @@ describe('VaultClient', () => {
           Key: 'first.key'
         }
       ]});
-
-      vaultClient = VaultClient({
-        bucketName: BUCKET_NAME_FIXTURE,
-        vaultKey: VAULT_KEY_FIXTURE
-      });
     });
 
     it('resolves to an Array of names', () => vaultClient.all().then(all => all.should.be.an.Array()));
