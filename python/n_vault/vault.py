@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import boto3
 import os
+import boto3
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from botocore.exceptions import ClientError
