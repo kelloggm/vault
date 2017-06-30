@@ -24,7 +24,7 @@ setup(name='nitor-vault',
       packages=['n_vault'],
       include_package_data=True,
       entry_points={
-          'console_scripts': ['vault=n_vault.cli:main'],
+          'console_scripts': ['vault=n_vault.cli:main']
       },
       install_requires=[
           'boto3',
