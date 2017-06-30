@@ -52,9 +52,9 @@ describe('VaultClient', () => {
     beforeEach(() => {
       getObjectSpy
         .onCall(0)
-        .yields(null, ENCRYPTED_KEY_FIXTURE)
+        .yields(null, { Body: ENCRYPTED_KEY_FIXTURE })
         .onCall(1)
-        .yields(null, 'foo');
+        .yields(null, { Body: 'foo' });
 
       decryptSpy.yields(null, {
         Plaintext: crypto.randomBytes(32)

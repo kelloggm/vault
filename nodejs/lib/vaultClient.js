@@ -33,12 +33,12 @@ createVaultClient = (options) => {
     lookup: (name) => Promise.all([
       s3.getObject(createKeyRequestObject(bucketName, name)).promise()
         .then((encryptedKey) => {
-          return kms.decrypt({ CiphertextBlob: encryptedKey }).promise();
+          return kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise();
         }),
       s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()
     ]).then((keyAndValue) => {
       const decryptedKey = keyAndValue[0].Plaintext;
-      const encryptedValue = keyAndValue[1];
+      const encryptedValue = keyAndValue[1].Body;
       const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
       decipher.update(encryptedValue);
       return Promise.resolve(decipher.final(ENCODING));
