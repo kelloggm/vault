@@ -27,7 +27,7 @@ createVaultClient = (options) => {
   const writeObject = (base, value) => s3.putObject(Object.assign({
     Body: value,
     ACL: 'private'
-  }, base));
+  }, base)).promise();
 
   return {
     lookup: (name) => Promise.all([
@@ -53,8 +53,8 @@ createVaultClient = (options) => {
       return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.final(ENCODING) });
     }).then((keyAndValue) => {
       return Promise.all([
-        writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key).promise(),
-        writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value).promise()
+        writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
+        writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value)
       ]);
     }),
 
