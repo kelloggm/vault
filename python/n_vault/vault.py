@@ -113,14 +113,20 @@ class Vault(object):
         s3cl = self._session.client('s3')
         s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.key')
         s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.encrypted')
+
     def all(self):
-        s3bucket = self._session.resource('s3').Bucket(self._vault_bucket)
         ret = ""
-        for object in s3bucket.objects.filter(Prefix=self._prefix):
-            if object.key.endswith(".encrypted"):
-                ret = ret + object.key[:-10] + os.linesep
+        for item in self.list_all():
+            ret = ret + item + os.linesep
         return ret
 
+    def list_all(self):
+        s3bucket = self._session.resource('s3').Bucket(self._vault_bucket)
+        ret = []
+        for next_object in s3bucket.objects.filter(Prefix=self._prefix):
+            if next_object.key.endswith(".encrypted"):
+                ret.append(next_object.key[:-10])
+        return ret
 
 def _get_cipher(key):
     ctr = Counter.new(128, initial_value=1337)
