@@ -141,16 +141,9 @@ def main():
                 sys.stdout.write(data)
     else:
         if not args.bucket:
-            try:
-                if not instance_data:
-                    response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
-                    instance_data = json.loads(response.text)
-                account_id = instance_data['accountId']
-                args.bucket = "vault-" + account_id
-            except ConnectionError:
-                iam = boto3.client("iam")
-                arn = iam.get_user()['User']['Arn']
-                args.bucket = "vault-" + arn.split(':')[4]
+            sts = boto3.client("sts")
+            account_id = sts.get_caller_identity()['Account']
+            args.bucket = "vault-" + account_id
         clf = boto3.client("cloudformation")
         try:
             clf.describe_stacks(StackName=args.vaultstack)
