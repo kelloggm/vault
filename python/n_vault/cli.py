@@ -41,9 +41,9 @@ def main():
     parser.add_argument('-w', '--overwrite', action='store_true',
                         help="Add this argument if you want to overwrite an " +\
                              "existing element")
-    data = parser.add_mutually_exclusive_group(required=False)
-    data.add_argument('-v', '--value', help="Value to store")
-    data.add_argument('-f', '--file', help="File to store. If no -s argument" +\
+    store_data = parser.add_mutually_exclusive_group(required=False)
+    store_data.add_argument('-v', '--value', help="Value to store")
+    store_data.add_argument('-f', '--file', help="File to store. If no -s argument" +\
                                            " given, the name of the file is " +\
                                            "used as the default name. Give -" +\
                                            " for stdin")
