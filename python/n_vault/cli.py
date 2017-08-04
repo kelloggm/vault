@@ -109,6 +109,8 @@ def main():
         except ConnectionError:
             # no-op
             args.region = ""
+    elif not args.region:
+        args.region = os.environ['AWS_DEFAULT_REGION']
 
     if args.region:
         os.environ['AWS_DEFAULT_REGION'] = args.region
@@ -143,7 +145,7 @@ def main():
         if not args.bucket:
             sts = boto3.client("sts")
             account_id = sts.get_caller_identity()['Account']
-            args.bucket = "vault-" + account_id
+            args.bucket = "vault-" + args.region + "-" + account_id
         clf = boto3.client("cloudformation")
         try:
             clf.describe_stacks(StackName=args.vaultstack)
