@@ -21,6 +21,323 @@ import requests
 from requests.exceptions import ConnectionError
 from .vault import Vault
 
+TEMPLATE_STRING = """{
+  "Parameters": {
+    "paramBucketName": {
+      "Default": "nitor-core-vault",
+      "Type": "String",
+      "Description": "Name of the vault bucket"
+    }
+  },
+  "Resources": {
+    "resourceDecryptRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "resourceEncryptRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "kmsKey": {
+      "Type": "AWS::KMS::Key",
+      "Properties": {
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Id": "key-default-2",
+          "Statement": [
+            {
+              "Action": [
+                "kms:*"
+              ],
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              },
+              "Resource": "*",
+              "Effect": "Allow",
+              "Sid": "allowAdministration"
+            }
+          ]
+        },
+        "Description": "Key for encrypting / decrypting secrets"
+      }
+    },
+    "vaultBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "paramBucketName"
+        }
+      }
+    },
+    "iamPolicyEncrypt": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+              ],
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "paramBucketName"
+                    },
+                    "/*"
+                  ]
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "putVaultItems"
+            },
+            {
+              "Action": [
+                "s3:ListBucket"
+              ],
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "paramBucketName"
+                    }
+                  ]
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "listVault"
+            },
+            {
+              "Action": [
+                "cloudformation:DescribeStacks"
+              ],
+              "Resource": {
+                "Ref": "AWS::StackId"
+              },
+              "Effect": "Allow",
+              "Sid": "describeVault"
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:GenerateDataKey"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "kmsKey",
+                  "Arn"
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "allowEncrypt"
+            }
+          ]
+        },
+        "Description": "Policy to allow encrypting and decrypting vault secrets",
+        "Roles": [
+          {
+            "Ref": "resourceEncryptRole"
+          }
+        ]
+      }
+    },
+    "iamPolicyDecrypt": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject"
+              ],
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "paramBucketName"
+                    },
+                    "/*"
+                  ]
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "getVaultItems"
+            },
+            {
+              "Action": [
+                "s3:ListBucket"
+              ],
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "paramBucketName"
+                    }
+                  ]
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "listVault"
+            },
+            {
+              "Action": [
+                "cloudformation:DescribeStacks"
+              ],
+              "Resource": {
+                "Ref": "AWS::StackId"
+              },
+              "Effect": "Allow",
+              "Sid": "describeVault"
+            },
+            {
+              "Action": [
+                "kms:Decrypt"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "kmsKey",
+                  "Arn"
+                ]
+              },
+              "Effect": "Allow",
+              "Sid": "allowDecrypt"
+            }
+          ]
+        },
+        "Description": "Policy to allow decrypting vault secrets",
+        "Roles": [
+          {
+            "Ref": "resourceDecryptRole"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "vaultBucketName": {
+      "Description": "Vault Bucket",
+      "Value": {
+        "Ref": "vaultBucket"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "vaultBucketName"]]
+        }
+      }
+    },
+    "kmsKeyArn": {
+      "Description": "KMS key Arn",
+      "Value": {
+        "Fn::GetAtt": [
+          "kmsKey",
+          "Arn"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "kmsKeyArn"]]
+        }
+      }
+    },
+    "decryptRole": {
+      "Description": "The role for decrypting",
+      "Value": {
+        "Ref": "resourceDecryptRole"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "decryptRole"]]
+        }
+      }
+    },
+    "encryptRole": {
+      "Description": "The role for encrypting",
+      "Value": {
+        "Ref": "resourceEncryptRole"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "encryptRole"]]
+        }
+      }
+    },
+    "decryptPolicy": {
+      "Description": "The policy for decrypting",
+      "Value": {
+        "Ref": "iamPolicyDecrypt"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "decryptPolicy"]]
+        }
+      }
+    },
+    "encryptPolicy": {
+      "Description": "The policy for decrypting",
+      "Value": {
+        "Ref": "iamPolicyEncrypt"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "encryptPolicy"]]
+        }
+      }
+    }
+  }
+}"""
+
+TEMPLATE = json.dumps(json.loads(TEMPLATE_STRING))
 def main():
     parser = argparse.ArgumentParser(description="Store and lookup locally " +\
                                      "encrypted data stored in S3")
@@ -151,9 +468,8 @@ def main():
             clf.describe_stacks(StackName=args.vaultstack)
             print "Vault stack '" + args.vaultstack + "' already initialized"
         except:
-            template = '{"Parameters":{"paramBucketName":{"Description":"Name of the vault bucket","Type":"String","Default":"nitor-core-vault"}},"Resources":{"kmsKey":{"Type":"AWS::KMS::Key","Properties":{"Description":"Key for encrypting / decrypting secrets","KeyPolicy":{"Version":"2012-10-17","Id":"key-default-2","Statement":[{"Sid":"allowAdministration","Effect":"Allow","Principal":{"AWS":{"Fn::Join":["",["arn:aws:iam::",{"Ref":"AWS::AccountId"},":root"]]}},"Action":["kms:*"],"Resource":"*"}]}}},"vaultBucket":{"Type":"AWS::S3::Bucket","Properties":{"BucketName":{"Ref":"paramBucketName"}}},"resourceDecryptRole":{"Type":"AWS::IAM::Role","Properties":{"AssumeRolePolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]},"Path":"/"}},"resourceEncryptRole":{"Type":"AWS::IAM::Role","Properties":{"AssumeRolePolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]},"Path":"/"}},"iamPolicyDecrypt":{"Type":"AWS::IAM::ManagedPolicy","Properties":{"Description":"Policy to allow decrypting vault secrets","Roles":[{"Ref":"resourceDecryptRole"}],"PolicyDocument":{"Version":"2012-10-17","Statement":[{"Sid":"getVaultItems","Effect":"Allow","Action":["s3:GetObject"],"Resource":{"Fn::Join":["",["arn:aws:s3:::",{"Ref":"paramBucketName"},"/*"]]}},{"Sid":"listVault","Effect":"Allow","Action":["s3:ListBucket"],"Resource":{"Fn::Join":["",["arn:aws:s3:::",{"Ref":"paramBucketName"}]]}},{"Sid":"describeVault","Effect":"Allow","Action":["cloudformation:DescribeStacks"],"Resource":{"Ref":"AWS::StackId"}},{"Sid":"allowDecrypt","Effect":"Allow","Action":["kms:Decrypt"],"Resource":{"Fn::GetAtt":["kmsKey","Arn"]}}]}}},"iamPolicyEncrypt":{"Type":"AWS::IAM::ManagedPolicy","Properties":{"Description":"Policy to allow encrypting and decrypting vault secrets","Roles":[{"Ref":"resourceEncryptRole"}],"PolicyDocument":{"Version":"2012-10-17","Statement":[{"Sid":"putVaultItems","Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":{"Fn::Join":["",["arn:aws:s3:::",{"Ref":"paramBucketName"},"/*"]]}},{"Sid":"listVault","Effect":"Allow","Action":["s3:ListBucket"],"Resource":{"Fn::Join":["",["arn:aws:s3:::",{"Ref":"paramBucketName"}]]}},{"Sid":"describeVault","Effect":"Allow","Action":["cloudformation:DescribeStacks"],"Resource":{"Ref":"AWS::StackId"}},{"Sid":"allowEncrypt","Effect":"Allow","Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey"],"Resource":{"Fn::GetAtt":["kmsKey","Arn"]}}]}}}},"Outputs":{"kmsKeyArn":{"Description":"KMS key Arn","Value":{"Fn::GetAtt":["kmsKey","Arn"]}},"vaultBucketName":{"Description":"Vault Bucket","Value":{"Ref":"vaultBucket"}},"decryptPolicy":{"Description":"The policy for decrypting","Value":{"Ref":"iamPolicyDecrypt"}},"encryptPolicy":{"Description":"The policy for decrypting","Value":{"Ref":"iamPolicyEncrypt"}},"decryptRole":{"Description":"The role for decrypting","Value":{"Ref":"resourceDecryptRole"}},"encryptRole":{"Description":"The role for encrypting","Value":{"Ref":"resourceEncryptRole"}}}}'
             params = {}
             params['ParameterKey'] = "paramBucketName"
             params['ParameterValue'] = args.bucket
-            clf.create_stack(StackName=args.vaultstack, TemplateBody=template,
+            clf.create_stack(StackName=args.vaultstack, TemplateBody=TEMPLATE,
                              Parameters=[params], Capabilities=['CAPABILITY_IAM'])
