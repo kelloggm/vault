@@ -337,7 +337,9 @@ TEMPLATE_STRING = """{
   }
 }"""
 
-TEMPLATE = json.dumps(json.loads(TEMPLATE_STRING))
+def _template():
+    return json.dumps(json.loads(TEMPLATE_STRING))
+
 def main():
     parser = argparse.ArgumentParser(description="Store and lookup locally " +\
                                      "encrypted data stored in S3")
@@ -471,5 +473,5 @@ def main():
             params = {}
             params['ParameterKey'] = "paramBucketName"
             params['ParameterValue'] = args.bucket
-            clf.create_stack(StackName=args.vaultstack, TemplateBody=TEMPLATE,
+            clf.create_stack(StackName=args.vaultstack, TemplateBody=_template(),
                              Parameters=[params], Capabilities=['CAPABILITY_IAM'])
