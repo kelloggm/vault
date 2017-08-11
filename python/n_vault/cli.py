@@ -117,7 +117,8 @@ TEMPLATE_STRING = """{
             {
               "Action": [
                 "s3:GetObject",
-                "s3:PutObject"
+                "s3:PutObject",
+                "s3:DeleteObject"
               ],
               "Resource": {
                 "Fn::Join": [
