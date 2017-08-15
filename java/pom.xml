@@ -20,7 +20,7 @@
   <packaging>jar</packaging>
 
   <name>aws-vault</name>
-  <url>http://github.com/NitorCreations/aws-vault-java</url>
+  <url>http://github.com/NitorCreations/vault/java</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
