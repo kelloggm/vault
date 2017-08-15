@@ -20,9 +20,14 @@ const createEncryptedValueRequestObject = (bucketName, name) => createRequestObj
 createVaultClient = (options) => {
   const bucketName = options.bucketName;
   const vaultKey = options.vaultKey;
+  const region = options.region || process.env.AWS_DEFAULT_REGION;
 
-  const s3 = new AWS.S3();
-  const kms = new AWS.KMS();
+  const s3 = new AWS.S3({
+    region: region
+  });
+  const kms = new AWS.KMS({
+    region: region
+  });
 
   const writeObject = (base, value) => s3.putObject(Object.assign({
     Body: value,
