@@ -5,5 +5,8 @@
   "main": "nodejs/index.js",
   "repository": "https://github.com/NitorCreations/vault.git",
   "author": "pasi <pasi@nitor.com>",
-  "license": "Apache 2.0"
+  "license": "Apache 2.0",
+  "files": [
+    "nodejs"
+  ]
 }
