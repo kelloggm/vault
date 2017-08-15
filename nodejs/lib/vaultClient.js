@@ -20,28 +20,32 @@ const createEncryptedValueRequestObject = (bucketName, name) => createRequestObj
 createVaultClient = (options) => {
   const bucketName = options.bucketName;
   const vaultKey = options.vaultKey;
+  const region = options.region || process.env.AWS_DEFAULT_REGION;
 
-  const s3 = new AWS.S3();
-  const kms = new AWS.KMS();
+  const s3 = new AWS.S3({
+    region: region
+  });
+  const kms = new AWS.KMS({
+    region: region
+  });
 
   const writeObject = (base, value) => s3.putObject(Object.assign({
     Body: value,
     ACL: 'private'
-  }, base));
+  }, base)).promise();
 
   return {
     lookup: (name) => Promise.all([
       s3.getObject(createKeyRequestObject(bucketName, name)).promise()
         .then((encryptedKey) => {
-          return kms.decrypt({ CiphertextBlob: encryptedKey }).promise();
+          return kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise();
         }),
       s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()
     ]).then((keyAndValue) => {
       const decryptedKey = keyAndValue[0].Plaintext;
-      const encryptedValue = keyAndValue[1];
+      const encryptedValue = keyAndValue[1].Body;
       const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
-      decipher.update(encryptedValue);
-      return Promise.resolve(decipher.final(ENCODING));
+      return Promise.resolve(decipher.update(encryptedValue, ENCODING, ENCODING));
     }),
 
     store: (name, data) => kms.generateDataKey({
@@ -49,12 +53,11 @@ createVaultClient = (options) => {
       KeySpec: ALGORITHMS.kms
     }).promise().then((dataKey) => {
       const cipher = crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV);
-      cipher.update(data);
-      return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.final(ENCODING) });
+      return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.update(data, null, ENCODING) });
     }).then((keyAndValue) => {
       return Promise.all([
-        writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key).promise(),
-        writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value).promise()
+        writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
+        writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value)
       ]);
     }),
 
