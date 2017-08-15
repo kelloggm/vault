@@ -45,8 +45,7 @@ createVaultClient = (options) => {
       const decryptedKey = keyAndValue[0].Plaintext;
       const encryptedValue = keyAndValue[1].Body;
       const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
-      decipher.update(encryptedValue);
-      return Promise.resolve(decipher.final(ENCODING));
+      return Promise.resolve(decipher.update(encryptedValue, ENCODING, ENCODING));
     }),
 
     store: (name, data) => kms.generateDataKey({
@@ -54,8 +53,7 @@ createVaultClient = (options) => {
       KeySpec: ALGORITHMS.kms
     }).promise().then((dataKey) => {
       const cipher = crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV);
-      cipher.update(data);
-      return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.final(ENCODING) });
+      return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.update(data, null, ENCODING) });
     }).then((keyAndValue) => {
       return Promise.all([
         writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
