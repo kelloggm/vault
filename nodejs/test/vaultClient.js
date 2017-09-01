@@ -20,6 +20,7 @@ describe('VaultClient', () => {
   const headObjectSpy = sinon.stub();
   const listObjectsSpy = sinon.stub();
   const deleteObjectSpy = sinon.stub();
+  const resolveStub = sinon.stub().yields();
 
   before(() => {
     AWS.mock('S3', 'getObject', getObjectSpy);
@@ -29,6 +30,7 @@ describe('VaultClient', () => {
     AWS.mock('S3', 'deleteObject', deleteObjectSpy);
     AWS.mock('KMS', 'decrypt', decryptSpy);
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
+    AWS.mock('CredentialProviderChain', 'resolve', resolveStub)
   });
 
   beforeEach(() => {
