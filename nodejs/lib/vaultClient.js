@@ -34,51 +34,73 @@ createVaultClient = (options) => {
     ACL: 'private'
   }, base)).promise();
 
+  const ensureCredentials = () => {
+    if (AWS.config.credentials) {
+      return Promise.resolve();
+    }
+    return new AWS.CredentialProviderChain([
+      new AWS.SharedIniFileCredentials(),
+      new AWS.EnvironmentCredentials('AWS'),
+      new AWS.EC2MetadataCredentials({
+        httpOptions: { timeout: 5000 },
+        maxRetries: 10,
+        retryDelayOptions: { base: 200 }
+      })
+    ]).resolvePromise();
+  };
+
   return {
-    lookup: (name) => Promise.all([
-      s3.getObject(createKeyRequestObject(bucketName, name)).promise()
-        .then((encryptedKey) => {
-          return kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise();
-        }),
-      s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()
-    ]).then((keyAndValue) => {
-      const decryptedKey = keyAndValue[0].Plaintext;
-      const encryptedValue = keyAndValue[1].Body;
-      const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
-      return Promise.resolve(decipher.update(encryptedValue, ENCODING, ENCODING));
-    }),
+    lookup: (name) => ensureCredentials()
+      .then(() =>
+        Promise.all([
+          s3.getObject(createKeyRequestObject(bucketName, name)).promise()
+            .then((encryptedKey) => kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise()),
+          s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()
+        ])
+      )
+      .then((keyAndValue) => {
+        const decryptedKey = keyAndValue[0].Plaintext;
+        const encryptedValue = keyAndValue[1].Body;
+        const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
+        return Promise.resolve(decipher.update(encryptedValue, ENCODING, ENCODING));
+      }),
 
-    store: (name, data) => kms.generateDataKey({
-      KeyId: vaultKey,
-      KeySpec: ALGORITHMS.kms
-    }).promise().then((dataKey) => {
-      const cipher = crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV);
-      return Promise.resolve({ key: dataKey.CiphertextBlob, value: cipher.update(data, null, ENCODING) });
-    }).then((keyAndValue) => {
-      return Promise.all([
-        writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
-        writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value)
-      ]);
-    }),
+    store: (name, data) => ensureCredentials()
+      .then(() =>
+        kms.generateDataKey({
+          KeyId: vaultKey,
+          KeySpec: ALGORITHMS.kms
+        }).promise())
+      .then((dataKey) =>
+        Promise.resolve({ key: dataKey.CiphertextBlob, value: crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV).update(data, null, ENCODING) }))
+      .then((keyAndValue) =>
+        Promise.all([
+          writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
+          writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value)
+        ])),
 
-    delete: (name) => Promise.all([
-      s3.deleteObject(createEncryptedValueRequestObject(bucketName, name)).promise(),
-      s3.deleteObject(createKeyRequestObject(bucketName, name)).promise()
-    ]),
+    delete: (name) => ensureCredentials()
+      .then(() =>
+        Promise.all([
+          s3.deleteObject(createEncryptedValueRequestObject(bucketName, name)).promise(),
+          s3.deleteObject(createKeyRequestObject(bucketName, name)).promise()
+        ])),
 
-    exists: (name) => s3.headObject(createEncryptedValueRequestObject(bucketName, name)).promise().then(
-      () => Promise.resolve(true),
-      () => Promise.resolve(false)
+    exists: (name) => ensureCredentials()
+      .then(() =>
+        s3.headObject(createEncryptedValueRequestObject(bucketName, name)).promise())
+      .then(() => Promise.resolve(true), () => Promise.resolve(false)
     ),
 
-    all: () => s3.listObjectsV2({
-      Bucket: bucketName
-    }).promise().then((data) => {
-      return Promise.resolve(data.Contents
+    all: () => ensureCredentials()
+      .then(() =>
+        s3.listObjectsV2({
+          Bucket: bucketName
+        }).promise())
+      .then((data) => Promise.resolve(data.Contents
         .filter((object) => object.Key.endsWith('.encrypted'))
-        .map(object => object.Key.slice(0, -('.encrypted'.length))));
-    })
-  }
+        .map(object => object.Key.slice(0, -('.encrypted'.length)))))
+  };
 };
 
 module.exports = createVaultClient;
