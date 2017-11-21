@@ -21,6 +21,7 @@ import requests
 from requests.exceptions import ConnectionError
 from .vault import Vault
 
+VAULT_STACK_VERSION = 18
 TEMPLATE_STRING = """{
   "Parameters": {
     "paramBucketName": {
@@ -41,7 +42,7 @@ TEMPLATE_STRING = """{
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": "ec2.amazonaws.com"
+                "Service": ["ec2.amazonaws.com"]
               }
             }
           ]
@@ -59,13 +60,32 @@ TEMPLATE_STRING = """{
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": "ec2.amazonaws.com"
+                "Service": ["ec2.amazonaws.com"]
               }
             }
           ]
         }
       }
     },
+    "resourceLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["lambda.amazonaws.com"]
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+      }
+    },    
     "kmsKey": {
       "Type": "AWS::KMS::Key",
       "Properties": {
@@ -253,6 +273,14 @@ TEMPLATE_STRING = """{
               },
               "Effect": "Allow",
               "Sid": "allowDecrypt"
+            },
+            {
+              "Sid": "InvokeLambdaPermission",
+              "Effect": "Allow",
+              "Action": [
+                  "lambda:InvokeFunction"
+              ],
+              "Resource": {"Fn::GetAtt": ["lambdaDecrypter", "Arn"]}
             }
           ]
         },
@@ -260,8 +288,71 @@ TEMPLATE_STRING = """{
         "Roles": [
           {
             "Ref": "resourceDecryptRole"
+          },
+          {
+            "Ref": "resourceLambdaRole"
           }
         ]
+      }
+    },
+    "lambdaDecrypter": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Description": { "Fn::Sub": "Nitor Vault ${AWS::StackName} Decrypter"},
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Runtime": "python2.7",
+        "Timeout": 300,
+        "Role": {"Fn::GetAtt": ["resourceLambdaRole", "Arn"]},
+        "FunctionName": {"Fn::Sub": "${AWS::StackName}-decrypter"},
+        "Code": {
+          "ZipFile" : { "Fn::Join" : ["\\n", [
+            "import json",
+            "import logging",
+            "import boto3",
+            "import base64",
+            "from botocore.vendored import requests",
+            "log = logging.getLogger()",
+            "log.setLevel(logging.INFO)",
+            "kms = boto3.client('kms')",
+            "SUCCESS = 'SUCCESS'",
+            "FAILED = 'FAILED'",
+            "def handler(event, context):",
+            "  ciphertext = event['ResourceProperties']['Ciphertext']",
+            "  responseData = {}",
+            "  try:",
+            "    responseData['Plaintext'] = kms.decrypt(CiphertextBlob=base64.b64decode(ciphertext)).get('Plaintext')",
+            "    log.info('Decrypt successful!')",
+            "    send(event, context, SUCCESS, responseData, event['LogicalResourceId'])",
+            "  except Exception as e:",
+            "    error_msg = 'Failed to decrypt: ' + repr(e)",
+            "    log.error(error_msg)",
+            "    send(event, context, FAILED, responseData, event['LogicalResourceId'])",
+            "    raise Exception(error_msg)",
+            "",
+            "def send(event, context, responseStatus, responseData, physicalResourceId):",
+            "  responseUrl = event['ResponseURL']",
+            "  responseBody = {}",
+            "  responseBody['Status'] = responseStatus",
+            "  responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name",
+            "  responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name",
+            "  responseBody['StackId'] = event['StackId']",
+            "  responseBody['RequestId'] = event['RequestId']",
+            "  responseBody['LogicalResourceId'] = event['LogicalResourceId']",
+            "  responseBody['Data'] = responseData",
+            "  json_responseBody = json.dumps(responseBody)",
+            "  headers = {",
+            "    'content-type' : '',",
+            "    'content-length' : str(len(json_responseBody))",
+            "  }",
+            "  try:",
+            "    response = requests.put(responseUrl,",
+            "                            data=json_responseBody,",
+            "                            headers=headers)",
+            "  except Exception as e:",
+            "    log.warning('send(..) failed executing requests.put(..): ' + repr(e))"
+          ]]}
+        }
       }
     }
   },
@@ -334,9 +425,29 @@ TEMPLATE_STRING = """{
           "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "encryptPolicy"]]
         }
       }
-    }
+    },
+    "vaultStackVersion": {
+      "Description": "The version of the currently deployed vault stack template",
+      "Value": "%(version)s",
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "vaultStackVersion"]]
+        }
+      }
+    },
+    "lambdaDecrypterArn": {
+      "Description": "Decrypter Lambda function ARN",
+      "Value": {
+        "Fn::Sub": "${lambdaDecrypter.Arn}"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [":", [{"Ref": "AWS::StackName"}, "lambdaDecrypterArn"]]
+        }
+      }
+    }        
   }
-}"""
+}""" % {"version": VAULT_STACK_VERSION}
 
 def _template():
     return json.dumps(json.loads(TEMPLATE_STRING))
@@ -355,6 +466,9 @@ def main():
                               "count via CloudFormation. Means that the acco" +\
                               "unt used has to have rights to create the res" +\
                               "ources")
+    action.add_argument('-u', '--update', action='store_true',
+                        help="Updates the CloudFormation stack which declare" +\
+                              "s all resources needed by the vault.")
     action.add_argument('-d', '--delete', help="Name of element to delete")
     action.add_argument('-a', '--all', action='store_true', help="List avail" +\
                                                                  "able secrets")
@@ -389,7 +503,7 @@ def main():
     if args.store and not (args.value or args.file):
         parser.error("--store requires --value or --file")
     store_with_no_name = not args.store and not args.lookup and not args.init \
-                         and not args.delete and not args.all
+                         and not args.delete and not args.all and not args.update
     if store_with_no_name and not args.file:
         parser.error("--store requires a name or a --file argument to get the name to store")
     elif store_with_no_name:
@@ -435,7 +549,7 @@ def main():
     if args.region:
         os.environ['AWS_DEFAULT_REGION'] = args.region
 
-    if not args.init:
+    if not args.init and not args.update:
         vlt = Vault(vault_stack=args.vaultstack, vault_key=args.key_arn,
                     vault_bucket=args.bucket, vault_iam_id=args.id,
                     vault_iam_secret=args.secret, vault_prefix=args.prefix)
@@ -467,12 +581,36 @@ def main():
             account_id = sts.get_caller_identity()['Account']
             args.bucket = "vault-" + args.region + "-" + account_id
         clf = boto3.client("cloudformation")
-        try:
-            clf.describe_stacks(StackName=args.vaultstack)
-            print "Vault stack '" + args.vaultstack + "' already initialized"
-        except:
-            params = {}
-            params['ParameterKey'] = "paramBucketName"
-            params['ParameterValue'] = args.bucket
-            clf.create_stack(StackName=args.vaultstack, TemplateBody=_template(),
-                             Parameters=[params], Capabilities=['CAPABILITY_IAM'])
+        if args.init:
+            try:
+                clf.describe_stacks(StackName=args.vaultstack)
+                print "Vault stack '" + args.vaultstack + "' already initialized"
+            except:
+                params = {}
+                params['ParameterKey'] = "paramBucketName"
+                params['ParameterValue'] = args.bucket
+                clf.create_stack(StackName=args.vaultstack, TemplateBody=_template(),
+                                 Parameters=[params], Capabilities=['CAPABILITY_IAM'])
+        elif args.update:
+            try:
+                stack = clf.describe_stacks(StackName=args.vaultstack)
+                deployed_version = None
+                ok_to_update = False
+                for output in stack['Stacks'][0]['Outputs']:
+                    if output['OutputKey'] == 'vaultStackVersion':
+                        deployed_version = int(output['OutputValue'])
+                        if int(output['OutputValue']) < VAULT_STACK_VERSION:
+                            ok_to_update = True
+                        break
+                if ok_to_update or deployed_version is None:
+                    params = {}
+                    params['ParameterKey'] = "paramBucketName"
+                    params['UsePreviousValue'] = True
+                    clf.update_stack(StackName=args.vaultstack, TemplateBody=_template(),
+                                     Parameters=[params], Capabilities=['CAPABILITY_IAM'])
+                else:
+                    print "Current stack version %(cur_ver)s does not need update to " \
+                          "version %(code_version)s" % {"cur_ver": deployed_version,
+                                                        "code_version": VAULT_STACK_VERSION}
+            except Exception as e:
+                print "Error while updating stack '" + args.vaultstack + "': " + repr(e)
