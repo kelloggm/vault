@@ -21,7 +21,7 @@ import requests
 from requests.exceptions import ConnectionError
 from .vault import Vault
 
-VAULT_STACK_VERSION = 18
+VAULT_STACK_VERSION = 19
 TEMPLATE_STRING = """{
   "Parameters": {
     "paramBucketName": {
@@ -197,6 +197,14 @@ TEMPLATE_STRING = """{
               },
               "Effect": "Allow",
               "Sid": "allowEncrypt"
+            },
+            {
+              "Sid": "InvokeLambdaPermission",
+              "Effect": "Allow",
+              "Action": [
+                  "lambda:InvokeFunction"
+              ],
+              "Resource": {"Fn::GetAtt": ["lambdaDecrypter", "Arn"]}
             }
           ]
         },
