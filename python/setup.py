@@ -1,4 +1,4 @@
-# Copyright 20.8-20.8 Nitor Creations Oy
+# Copyright 20.9-20.9 Nitor Creations Oy
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
 from setuptools import setup
 
 setup(name='nitor-vault',
-      version='0.8',
+      version='0.9',
       description='Vault for storing locally encypted data in S3 using KMS keys',
       url='http://github.com/NitorCreations/vault',
-      download_url='https://github.com/NitorCreations/vault/tarball/0.8',
+      download_url='https://github.com/NitorCreations/vault/tarball/0.9',
       author='Pasi Niemi',
       author_email='pasi@nitor.com',
       license='Apache 2.0',
