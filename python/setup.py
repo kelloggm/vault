@@ -31,6 +31,7 @@ setup(name='nitor-vault',
           'awscli',
           'pycrypto',
           'requests',
-          'argcomplete'
+          'argcomplete',
+          'future'
       ],
       zip_safe=False)
