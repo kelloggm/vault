@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-# Copyright 2016 Nitor Creations Oy
+# Copyright 2016-2018 Nitor Creations Oy
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ if [ "$1" = "-m" ]; then
   MINOR="0"
   shift
 else
-  MINOR=$(($MINOR + 1))
+  MINOR_NEW=$(($MINOR + 1))
 fi
-sed -i "s/$VERSION/$MAJOR.$MINOR/g" setup.py
+sed -i "s/$MAJOR\.$MINOR/$MAJOR.$MINOR_NEW/g" setup.py
 git commit -m "$1" setup.py
 git tag "$MAJOR.$MINOR" -m "$1"
 git push --tags origin master
