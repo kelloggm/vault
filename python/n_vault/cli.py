@@ -1,3 +1,4 @@
+
 # Copyright 2016 Nitor Creations Oy
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 import argparse
+import locale
 import os
 import sys
 import json
@@ -21,6 +24,7 @@ import requests
 from requests.exceptions import ConnectionError
 from .vault import Vault
 
+SYS_ENCODING = locale.getpreferredencoding()
 VAULT_STACK_VERSION = 19
 TEMPLATE_STRING = """{
   "Parameters": {
@@ -579,10 +583,10 @@ def main():
         else:
             data = vlt.lookup(args.lookup)
             if args.outfile and not args.outfile == "-":
-                with open(args.outfile, 'w') as outf:
+                with open(args.outfile, 'wb') as outf:
                     outf.write(data)
             else:
-                sys.stdout.write(data)
+                sys.stdout.write(data.decode(SYS_ENCODING))
     else:
         if not args.bucket:
             sts = boto3.client("sts")
@@ -592,7 +596,7 @@ def main():
         if args.init:
             try:
                 clf.describe_stacks(StackName=args.vaultstack)
-                print "Vault stack '" + args.vaultstack + "' already initialized"
+                print("Vault stack '" + args.vaultstack + "' already initialized")
             except:
                 params = {}
                 params['ParameterKey'] = "paramBucketName"
@@ -617,8 +621,8 @@ def main():
                     clf.update_stack(StackName=args.vaultstack, TemplateBody=_template(),
                                      Parameters=[params], Capabilities=['CAPABILITY_IAM'])
                 else:
-                    print "Current stack version %(cur_ver)s does not need update to " \
+                    print("Current stack version %(cur_ver)s does not need update to " \
                           "version %(code_version)s" % {"cur_ver": deployed_version,
-                                                        "code_version": VAULT_STACK_VERSION}
+                                                        "code_version": VAULT_STACK_VERSION})
             except Exception as e:
-                print "Error while updating stack '" + args.vaultstack + "': " + repr(e)
+                print("Error while updating stack '" + args.vaultstack + "': " + repr(e))
