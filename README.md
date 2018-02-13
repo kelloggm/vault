@@ -10,6 +10,11 @@ Initialize vault bucket and other infrastructure: `vault --init`. Will create a 
 Encrypt a file and store in vault bucket: `vault -f <file>`
 
 Decrypt a file: `vault -l <file>`
+
+Encrypt a single value and store in vault bucket `vault -s my-key -v my-value`
+
+Decrypt a single value `vault -l my-key`
+
 ## Using encrypted CloudFormation stack parameters
 
 Encrypt a value like this: `$ aws kms encrypt --key-id <key id or ARN> --plaintext 'My secret value'`
