@@ -82,7 +82,7 @@ TEMPLATE_STRING = """{
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": ["lambda.amazonaws.com"]
+                "Service": ["lambda.amazonaws.com", "edgelambda.amazonaws.com"]
               }
             }
           ]
