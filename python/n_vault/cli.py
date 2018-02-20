@@ -25,7 +25,7 @@ from requests.exceptions import ConnectionError
 from .vault import Vault
 
 SYS_ENCODING = locale.getpreferredencoding()
-VAULT_STACK_VERSION = 19
+VAULT_STACK_VERSION = 20
 TEMPLATE_STRING = """{
   "Parameters": {
     "paramBucketName": {
