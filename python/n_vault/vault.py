@@ -46,7 +46,7 @@ class Vault(object):
         if vault_bucket:
             self._vault_bucket = vault_bucket
         elif "VAULT_BUCKET" in os.environ:
-            self._vault_key = os.environ["VAULT_BUCKET"]
+            self._vault_bucket = os.environ["VAULT_BUCKET"]
         # If not given in constructor or environment, resolve from CloudFormation
         if not (self._vault_key and self._vault_bucket):
             stack_info = self._get_cf_params(vault_stack)
