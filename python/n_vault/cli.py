@@ -464,6 +464,42 @@ TEMPLATE_STRING = """{
 def _template():
     return json.dumps(json.loads(TEMPLATE_STRING))
 
+def is_ec2():
+    if sys.platform.startswith("win"):
+        import wmi
+        systeminfo = wmi.WMI().Win32_ComputerSystem()[0]
+        return "EC2" == systeminfo.PrimaryOwnerName
+    elif sys.platform.startswith("linux"):
+        if os.path.isfile("/sys/hypervisor/uuid"):
+            with open("/sys/hypervisor/uuid") as uuid:
+                uuid_str = uuid.read()
+                return uuid_str.startswith("ec2")
+        else:
+            return False
+
+def region():
+    """ Get default region - the region of the instance if run in an EC2 instance
+    """
+    # If it is set in the environment variable, use that
+    if 'AWS_DEFAULT_REGION' in os.environ:
+        return os.environ['AWS_DEFAULT_REGION']
+    else:
+        # Otherwise it might be configured in AWS credentials
+        session = boto3.session.Session()
+        if session.region_name:
+            return session.region_name
+        # If not configured and being called from an ec2 instance, use the
+        # region of the instance
+        elif is_ec2():
+          try:
+              response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
+              instance_data = json.loads(response.text)
+              args.region = instance_data['region']
+          except ConnectionError:
+              # no-op
+              return ""
+    return ""
+
 def main():
     parser = argparse.ArgumentParser(description="Store and lookup locally " +\
                                      "encrypted data stored in S3")
@@ -547,17 +583,8 @@ def main():
 
     instance_data = None
     # Try to get region from instance metadata if not otherwise specified
-    if not args.region and not "AWS_DEFAULT_REGION" in os.environ:
-        try:
-            response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
-            instance_data = json.loads(response.text)
-            args.region = instance_data['region']
-        except ConnectionError:
-            # no-op
-            args.region = ""
-    elif not args.region:
-        args.region = os.environ['AWS_DEFAULT_REGION']
-
+    if not args.region:
+        args.region = region()
     if args.region:
         os.environ['AWS_DEFAULT_REGION'] = args.region
 
