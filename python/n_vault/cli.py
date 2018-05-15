@@ -494,7 +494,7 @@ def region():
           try:
               response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
               instance_data = json.loads(response.text)
-              args.region = instance_data['region']
+              return instance_data['region']
           except ConnectionError:
               # no-op
               return ""
