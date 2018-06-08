@@ -66,7 +66,7 @@ class Vault(object):
         return ret
 
     def _decrypt(self, data_key, encrypted):
-        decrypted_key = self._kms.decrypt(CiphertextBlob=data_key)['Plaintext']
+        decrypted_key = self.direct_decrypt(data_key)
         cipher = _get_cipher(decrypted_key)
         return cipher.decrypt(encrypted)
 
@@ -128,6 +128,18 @@ class Vault(object):
             if next_object.key.endswith(".encrypted"):
                 ret.append(next_object.key[:-10])
         return ret
+
+    def get_key(self):
+        return self._vault_key
+
+    def get_bucket(self):
+        return self._vault_bucket
+
+    def direct_encrypt(self, data):
+        return self._kms.encrypt(KeyId=self._vault_key, Plaintext=data)['CiphertextBlob']
+
+    def direct_decrypt(self, encrypted_data):
+        return self._kms.decrypt(CiphertextBlob=encrypted_data)['Plaintext']
 
 def _get_cipher(key):
     ctr = Counter.new(128, initial_value=1337)
