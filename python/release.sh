@@ -20,13 +20,19 @@ MINOR=${VERSION##*.}
 if [ "$1" = "-m" ]; then
   MAJOR=$(($MAJOR + 1))
   MINOR="0"
+  NEW_VERSION=$MAJOR.$MINOR
+  shift
+elif [ "$1" = "-v" ]; then
+  shift
+  NEW_VERSION="$1"
   shift
 else
-  MINOR_NEW=$(($MINOR + 1))
+  MINOR=$(($MINOR + 1))
+  NEW_VERSION=$MAJOR.$MINOR
 fi
-sed -i "s/$MAJOR\.$MINOR/$MAJOR.$MINOR_NEW/g" setup.py
-git commit -m "$1" setup.py
-git tag "$MAJOR.$MINOR" -m "$1"
+
+sed -i "s/$VERSION/$NEW_VERSION/g" setup.py
+git tag "$NEW_VERSION" -m "$1"
 git push --tags origin master
 
 python setup.py register -r pypi

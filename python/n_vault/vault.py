@@ -14,10 +14,13 @@
 
 from builtins import object
 import os
+from base64 import b64decode, b64encode
 import boto3
+import json
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from botocore.exceptions import ClientError
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class Vault(object):
     _session = boto3.Session()
@@ -61,14 +64,24 @@ class Vault(object):
                                                KeySpec="AES_256")
         data_key = key_dict['Plaintext']
         ret['datakey'] = key_dict['CiphertextBlob']
+        aesgcm_cipher = AESGCM(data_key)
+        nonce = os.urandom(12)
+        meta = json.dumps({"alg": "AESGCM", "nonce": b64encode(nonce)}).encode()
+        ret['aes-gcm-ciphertext'] = aesgcm_cipher.encrypt(nonce, data, meta)
         cipher = _get_cipher(data_key)
         ret['ciphertext'] = cipher.encrypt(data)
+        ret['meta'] = meta
         return ret
 
     def _decrypt(self, data_key, encrypted):
         decrypted_key = self.direct_decrypt(data_key)
         cipher = _get_cipher(decrypted_key)
         return cipher.decrypt(encrypted)
+
+    def _aes_gcm_decrypt(self, nonce, data_key, encrypted):
+        decrypted_key = self.direct_decrypt(data_key)
+        cipher = AESGCM(decrypted_key)
+        return cipher.decrypt(nonce, encrypted, None)
 
     def _get_cf_params(self, stack_name):
         clf = self._session.client('cloudformation')
@@ -88,15 +101,35 @@ class Vault(object):
                         ACL='private', Key=self._prefix + name + '.key')
         s3cl.put_object(Bucket=self._vault_bucket, Body=encrypted['ciphertext'],
                         ACL='private', Key=self._prefix + name + '.encrypted')
+        s3cl.put_object(Bucket=self._vault_bucket, Body=encrypted['aes-gcm-ciphertext'],
+                        ACL='private', Key=self._prefix + name + '.aesgcm.encrypted')
+        s3cl.put_object(Bucket=self._vault_bucket, Body=encrypted['meta'],
+                        ACL='private', Key=self._prefix + name + '.meta')
         return True
 
     def lookup(self, name):
         s3cl = self._session.client('s3')
-        ciphertext = s3cl.get_object(Bucket=self._vault_bucket,
-                                     Key=self._prefix + name + '.encrypted')['Body'].read()
         datakey = s3cl.get_object(Bucket=self._vault_bucket,
                                   Key=self._prefix + name + '.key')['Body'].read()
-        return self._decrypt(datakey, ciphertext)
+        try:
+            meta = s3cl.get_object(Bucket=self._vault_bucket,
+                                   Key=self._prefix + name + '.meta')['Body'].read()
+            ciphertext = s3cl.get_object(Bucket=self._vault_bucket,
+                                         Key=self._prefix + name + '.aesgcm.encrypted')['Body'].read()
+            meta_add = meta.encode()
+            meta = json.loads(meta)
+            return AESGCM(self.direct_decrypt(datakey)).decrypt(b64decode(meta['nonce']), ciphertext, meta_add)
+        except ClientError as e:
+            if e.response['Error']['Code'] == "404" or e.response['Error']['Code'] == 'NoSuchKey':
+                ciphertext = s3cl.get_object(Bucket=self._vault_bucket,
+                                            Key=self._prefix + name + '.encrypted')['Body'].read()
+                return self._decrypt(datakey, ciphertext)
+            else:
+                raise
+
+    def recrypt(self, name):
+        data = self.lookup(name)
+        self.store(name, data)
 
     def exists(self, name):
         s3cl = self._session.client('s3')

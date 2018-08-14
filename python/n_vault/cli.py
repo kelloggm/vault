@@ -508,6 +508,7 @@ def main():
                                               "ionally read from file name",
                         nargs='?', default="")
     action.add_argument('-l', '--lookup', help="Name of element to lookup")
+    action.add_argument('-c', '--recrypt', help="Recrypt entry with AESGCM for added security")
     action.add_argument('-i', '--init', action='store_true',
                         help="Initializes a kms key and a s3 bucket with som" +\
                               "e roles for reading and writing on a fresh ac" +\
@@ -551,7 +552,8 @@ def main():
     if args.store and not (args.value or args.file):
         parser.error("--store requires --value or --file")
     store_with_no_name = not args.store and not args.lookup and not args.init \
-                         and not args.delete and not args.all and not args.update
+                         and not args.delete and not args.all and not args.update \
+                         and not args.recrypt
     if store_with_no_name and not args.file:
         parser.error("--store requires a name or a --file argument to get the name to store")
     elif store_with_no_name:
@@ -607,6 +609,9 @@ def main():
                     outf.write(data)
             else:
                 sys.stdout.write(data)
+        elif args.recrypt:
+            vlt.recrypt(args.recrypt)
+            print(args.recrypt + " successfully recrypted")
         else:
             data = vlt.lookup(args.lookup)
             if args.outfile and not args.outfile == "-":

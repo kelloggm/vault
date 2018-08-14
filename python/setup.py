@@ -32,7 +32,8 @@ setup(name='nitor-vault',
           'pycrypto',
           'requests',
           'argcomplete',
-          'future'
+          'future',
+          'cryptography'
       ] + ([
           'win-unicode-console',
           'wmi',
