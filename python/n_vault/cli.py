@@ -21,6 +21,7 @@ import json
 import argcomplete
 import boto3
 import requests
+from base64 import b64decode, b64encode
 from requests.exceptions import ConnectionError
 from .vault import Vault
 
@@ -521,6 +522,8 @@ def main():
     action.add_argument('-d', '--delete', help="Name of element to delete")
     action.add_argument('-a', '--all', action='store_true', help="List avail" +\
                                                                  "able secrets")
+    action.add_argument('-e', '--encrypt', help="Directly encrypt given value")
+    action.add_argument('-y', '--decrypt', help="Directly decrypt given value")
     parser.add_argument('-w', '--overwrite', action='store_true',
                         help="Add this argument if you want to overwrite an " +\
                              "existing element")
@@ -553,7 +556,7 @@ def main():
         parser.error("--store requires --value or --file")
     store_with_no_name = not args.store and not args.lookup and not args.init \
                          and not args.delete and not args.all and not args.update \
-                         and not args.recrypt
+                         and not args.recrypt and not args.encrypt and not args.decrypt
     if store_with_no_name and not args.file:
         parser.error("--store requires a name or a --file argument to get the name to store")
     elif store_with_no_name:
@@ -612,6 +615,10 @@ def main():
         elif args.recrypt:
             vlt.recrypt(args.recrypt)
             print(args.recrypt + " successfully recrypted")
+        elif args.encrypt:
+            print(b64encode(vlt.direct_encrypt(args.encrypt)))
+        elif args.decrypt:
+            print(vlt.direct_decrypt(b64decode(args.decrypt)))
         else:
             data = vlt.lookup(args.lookup)
             if args.outfile and not args.outfile == "-":
