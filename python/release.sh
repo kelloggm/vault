@@ -32,6 +32,7 @@ else
 fi
 
 sed -i "s/$VERSION/$NEW_VERSION/g" setup.py
+git commit -m "$1" setup.py
 git tag "$NEW_VERSION" -m "$1"
 git push --tags origin master
 
