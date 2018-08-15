@@ -32,7 +32,7 @@ Resources:
   DecryptSecret:
     Type: "Custom::VaultDecrypt"
     Properties:
-      ServiceToken: "arn:aws:lambda:<region>:<account-id>:function:vault-decrypt"
+      ServiceToken: "arn:aws:lambda:<region>:<account-id>:function:vault-decrypter"
       Ciphertext: { "Ref": "MySecret" }
   DatabaseWithSecretAsPassword:
     Type: "AWS::RDS::DBInstance"
