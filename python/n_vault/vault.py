@@ -147,6 +147,14 @@ class Vault(object):
         s3cl = self._session.client('s3')
         s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.key')
         s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.encrypted')
+        try:
+            s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.aesgcm.encrypted')
+            s3cl.delete_object(Bucket=self._vault_bucket, Key=self._prefix + name + '.meta')
+        except ClientError as e:
+            if e.response['Error']['Code'] == "404" or e.response['Error']['Code'] == 'NoSuchKey':
+                pass
+            else:
+                raise
 
     def all(self):
         ret = ""
