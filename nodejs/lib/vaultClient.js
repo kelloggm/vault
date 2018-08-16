@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const ALGORITHMS = Object.freeze({
   crypto: 'AES-256-CTR',
+  authCrypto: 'id-aes256-GCM',
   kms: 'AES_256'
 });
 const STATIC_IV = new Buffer([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1337 / 256, 1337 % 256]);
@@ -16,6 +17,10 @@ const createRequestObject = (bucketName, key) => Object.freeze({
 const createKeyRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.key`);
 
 const createEncryptedValueRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.encrypted`);
+
+const createAuthEncryptedValueRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.aesgcm.encrypted`);
+
+const createMetaRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.meta`);
 
 createVaultClient = (options) => {
   const bucketName = options.bucketName;
@@ -51,17 +56,24 @@ createVaultClient = (options) => {
 
   return {
     lookup: (name) => ensureCredentials()
-      .then(() =>
+      .then(() => {
         Promise.all([
           s3.getObject(createKeyRequestObject(bucketName, name)).promise()
             .then((encryptedKey) => kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise()),
-          s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()
-        ])
+          s3.getObject(createAuthEncryptedValueRequestObject(bucketName, name)).promise() 
+            .catch((e) => s3.getObject(createEncryptedValueRequestObject(bucketName, name).promise())),
+          s3.getObject(createMetaRequestObject(bucketName, name)).promise().catch(e => "nometa")
+        ])}
       )
       .then((keyAndValue) => {
         const decryptedKey = keyAndValue[0].Plaintext;
         const encryptedValue = keyAndValue[1].Body;
-        const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
+        if (keyAndValue[2] === "nometa") {
+          const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
+        } else {
+          nonce = Buffer.from(JSON.parse(keyAndValue[3].Body).nonce, "base64");
+          const decipher = crypto.createDecipheriv(ALGORITHMS.authCrypto, decryptedKey, nonce).setAAD(keyAndValue[2].Body);
+        }
         return Promise.resolve(decipher.update(encryptedValue, null, ENCODING));
       }),
 
@@ -71,19 +83,32 @@ createVaultClient = (options) => {
           KeyId: vaultKey,
           KeySpec: ALGORITHMS.kms
         }).promise())
-      .then((dataKey) =>
-        Promise.resolve({ key: dataKey.CiphertextBlob, value: crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV).update(data, ENCODING) }))
+      .then((dataKey) => {
+        const nonce = crypto.randomBytes(12);
+        const aad = Buffer.from(JSON.stringify({
+          alg: "AESGCM",
+          nonce: nonce.toString("base64")
+        }));
+        Promise.resolve({ key: dataKey.CiphertextBlob,
+                          value: crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV).update(data, ENCODING),
+                          authValue: crypto.createCipheriv(ALGORITHMS.authCrypto, dataKey.Plaintext, nonce).setAutoPadding(aad).update(data, ENCODING),
+                          meta: aad
+                        })})
       .then((keyAndValue) =>
         Promise.all([
           writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
-          writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value)
+          writeObject(createEncryptedValueRequestObject(bucketName, name), keyAndValue.value),
+          writeObject(createAuthEncryptedValueRequestObject(bucketName, name), keyAndValue.authValue),
+          writeObject(createMetaRequestObject(bucketName, name), keyAndValue.meta)
         ])),
 
     delete: (name) => ensureCredentials()
       .then(() =>
         Promise.all([
           s3.deleteObject(createEncryptedValueRequestObject(bucketName, name)).promise(),
-          s3.deleteObject(createKeyRequestObject(bucketName, name)).promise()
+          s3.deleteObject(createKeyRequestObject(bucketName, name)).promise(),
+          s3.deleteObject(createAuthEncryptedValueRequestObject(bucketName, name)).promise().catch(e => e),
+          s3.deleteObject(createMetaRequestObject(bucketName, name)).promise().catch(e => e)
         ])),
 
     exists: (name) => ensureCredentials()
