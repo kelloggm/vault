@@ -28,7 +28,7 @@ class Vault(object):
     _prefix = ""
     _vault_key = ""
     _vault_bucket = ""
-    def __init__(self, vault_stack="vault", vault_key="", vault_bucket="",
+    def __init__(self, vault_stack="", vault_key="", vault_bucket="",
                  vault_iam_id="", vault_iam_secret="", vault_prefix=""):
         self._prefix = vault_prefix
         if self._prefix and not self._prefix.endswith("/"):
@@ -52,7 +52,13 @@ class Vault(object):
             self._vault_bucket = os.environ["VAULT_BUCKET"]
         # If not given in constructor or environment, resolve from CloudFormation
         if not (self._vault_key and self._vault_bucket):
-            stack_info = self._get_cf_params(vault_stack)
+            stack = vault_stack
+            if not stack:
+                if "VAULT_STACK" in os.environ:
+                    stack = os.environ["VAULT_STACK"]
+                else:
+                    stack = "vault"
+            stack_info = self._get_cf_params(stack)
             if not self._vault_key:
                 self._vault_key = stack_info['key_arn']
             if not self._vault_bucket:
@@ -166,7 +172,9 @@ class Vault(object):
         s3bucket = self._session.resource('s3').Bucket(self._vault_bucket)
         ret = []
         for next_object in s3bucket.objects.filter(Prefix=self._prefix):
-            if next_object.key.endswith(".encrypted"):
+            if next_object.key.endswith(".aesgcm.encrypted") and next_object.key[:-17] not in ret:
+                ret.append(next_object.key[:-17])
+            elif next_object.key.endswith(".encrypted") and next_object.key[:-10] not in ret:
                 ret.append(next_object.key[:-10])
         return ret
 
