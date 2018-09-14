@@ -630,7 +630,7 @@ def main():
         if not args.bucket:
             sts = boto3.client("sts")
             account_id = sts.get_caller_identity()['Account']
-            args.bucket = "vault-" + args.region + "-" + account_id
+            args.bucket = args.vaultstack + "-" + args.region + "-" + account_id
         clf = boto3.client("cloudformation")
         if args.init:
             try:
