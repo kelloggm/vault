@@ -122,7 +122,9 @@ class Vault(object):
                                    Key=self._prefix + name + '.meta')['Body'].read()
             ciphertext = s3cl.get_object(Bucket=self._vault_bucket,
                                          Key=self._prefix + name + '.aesgcm.encrypted')['Body'].read()
-            meta_add = meta.encode()
+            meta_add = meta
+            if not isinstance(meta, bytes):
+                meta_add = meta.encode()
             meta = json.loads(meta)
             return AESGCM(self.direct_decrypt(datakey)).decrypt(b64decode(meta['nonce']), ciphertext, meta_add)
         except ClientError as e:
