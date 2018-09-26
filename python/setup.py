@@ -15,10 +15,10 @@ import sys
 from setuptools import setup
 
 setup(name='nitor-vault',
-      version='0.26',
+      version='0.27',
       description='Vault for storing locally encypted data in S3 using KMS keys',
       url='http://github.com/NitorCreations/vault',
-      download_url='https://github.com/NitorCreations/vault/tarball/0.26',
+      download_url='https://github.com/NitorCreations/vault/tarball/0.27',
       author='Pasi Niemi',
       author_email='pasi@nitor.com',
       license='Apache 2.0',
