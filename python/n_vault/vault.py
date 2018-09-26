@@ -196,7 +196,7 @@ class Vault(object):
     def direct_decrypt(self, encrypted_data):
         return self._kms.decrypt(CiphertextBlob=encrypted_data)['Plaintext']
 
-STATIC_IV = bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, int(1337 / 256), int(1337 % 256)])
+STATIC_IV = bytearray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 & 0xFF, int(1337 / 256) & 0xFF, int(1337 % 256) & 0xFF])
 def _get_cipher(key):
     backend = default_backend()
-    return Cipher(AES(key), CTR(STATIC_IV), backend=backend)
+    return Cipher(AES(key), CTR(bytes(STATIC_IV)), backend=backend)
