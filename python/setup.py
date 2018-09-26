@@ -29,7 +29,6 @@ setup(name='nitor-vault',
       },
       install_requires=[
           'boto3',
-          'pycrypto',
           'requests',
           'argcomplete',
           'future',

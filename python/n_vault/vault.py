@@ -17,10 +17,12 @@ import os
 from base64 import b64decode, b64encode
 import boto3
 import json
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
 from botocore.exceptions import ClientError
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.ciphers.algorithms import AES
+from cryptography.hazmat.primitives.ciphers.modes import CTR
+from cryptography.hazmat.primitives.ciphers import Cipher
+from cryptography.hazmat.backends import default_backend
 
 class Vault(object):
     _session = boto3.Session()
@@ -75,14 +77,16 @@ class Vault(object):
         meta = json.dumps({"alg": "AESGCM", "nonce": b64encode(nonce)}).encode()
         ret['aes-gcm-ciphertext'] = aesgcm_cipher.encrypt(nonce, data, meta)
         cipher = _get_cipher(data_key)
-        ret['ciphertext'] = cipher.encrypt(data)
+        encryptor = cipher.encryptor()
+        ret['ciphertext'] = encryptor.update(data) + encryptor.finalize()
         ret['meta'] = meta
         return ret
 
     def _decrypt(self, data_key, encrypted):
         decrypted_key = self.direct_decrypt(data_key)
         cipher = _get_cipher(decrypted_key)
-        return cipher.decrypt(encrypted)
+        decryptor = cipher.decryptor()
+        return decryptor.update(encrypted) + decryptor.finalize()
 
     def _aes_gcm_decrypt(self, nonce, data_key, encrypted):
         decrypted_key = self.direct_decrypt(data_key)
@@ -192,6 +196,7 @@ class Vault(object):
     def direct_decrypt(self, encrypted_data):
         return self._kms.decrypt(CiphertextBlob=encrypted_data)['Plaintext']
 
+STATIC_IV = bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, int(1337 / 256), int(1337 % 256)])
 def _get_cipher(key):
-    ctr = Counter.new(128, initial_value=1337)
-    return AES.new(key, AES.MODE_CTR, counter=ctr)
+    backend = default_backend()
+    return Cipher(AES(key), CTR(STATIC_IV), backend=backend)
