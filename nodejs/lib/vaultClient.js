@@ -22,7 +22,7 @@ const createAuthEncryptedValueRequestObject = (bucketName, name) => createReques
 
 const createMetaRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.meta`);
 
-createVaultClient = (options) => {
+const createVaultClient = (options) => {
   const bucketName = options.bucketName;
   const vaultKey = options.vaultKey;
   const region = options.region || process.env.AWS_DEFAULT_REGION;
