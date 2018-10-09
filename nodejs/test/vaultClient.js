@@ -56,7 +56,7 @@ describe('VaultClient', () => {
         .onCall(0)
         .yields(null, { Body: ENCRYPTED_KEY_FIXTURE })
         .onCall(1)
-        .yields(null, { Body: 'foo' })
+        .yields(null, { Body: Buffer.concat([new Buffer('foo'), crypto.randomBytes(16)]) })
         .onCall(2)
         .yields(null, {
           Body: Buffer.from(

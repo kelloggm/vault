@@ -22,6 +22,12 @@ const createAuthEncryptedValueRequestObject = (bucketName, name) => createReques
 
 const createMetaRequestObject = (bucketName, name) => createRequestObject(bucketName, `${name}.meta`);
 
+const createDecipher = (meta, decryptedKey) => {
+  return meta === 'nometa' ?
+    crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV) :
+    crypto.createDecipheriv(ALGORITHMS.authCrypto, decryptedKey, Buffer.from(JSON.parse(meta.Body).nonce, "base64")).setAAD(meta.Body);
+};
+
 const createVaultClient = (options) => {
   const bucketName = options.bucketName;
   const vaultKey = options.vaultKey;
@@ -59,21 +65,18 @@ const createVaultClient = (options) => {
       .then(() =>
         Promise.all([
           s3.getObject(createKeyRequestObject(bucketName, name)).promise()
-            .then((encryptedKey) => kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise()),
+            .then(encryptedKey => kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise()),
           s3.getObject(createAuthEncryptedValueRequestObject(bucketName, name)).promise() 
             .catch(e => s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()),
           s3.getObject(createMetaRequestObject(bucketName, name)).promise().catch(e => "nometa")
         ])
       )
-      .then((keyAndValue) => {
-        const decryptedKey = keyAndValue[0].Plaintext;
-        const encryptedValue = keyAndValue[1].Body;
-        if (keyAndValue[2] === "nometa") {
-          const decipher = crypto.createDecipheriv(ALGORITHMS.crypto, decryptedKey, STATIC_IV);
-        } else {
-          nonce = Buffer.from(JSON.parse(keyAndValue[3].Body).nonce, "base64");
-          const decipher = crypto.createDecipheriv(ALGORITHMS.authCrypto, decryptedKey, nonce).setAAD(keyAndValue[2].Body);
-        }
+      .then(keyValueAndMeta => {
+        const decryptedKey = keyValueAndMeta[0].Plaintext;
+        const encryptedValue = keyValueAndMeta[1].Body.slice(0, -16);
+        const authTag = keyValueAndMeta[1].Body.slice(-16);
+        const meta = keyValueAndMeta[2];
+        const decipher = createDecipher(meta, decryptedKey).setAuthTag(authTag);
         return Promise.resolve(decipher.update(encryptedValue, null, ENCODING));
       }),
 
@@ -89,11 +92,16 @@ const createVaultClient = (options) => {
           alg: "AESGCM",
           nonce: nonce.toString("base64")
         }));
-        Promise.resolve({ key: dataKey.CiphertextBlob,
-                          value: crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV).update(data, ENCODING),
-                          authValue: crypto.createCipheriv(ALGORITHMS.authCrypto, dataKey.Plaintext, nonce).setAutoPadding(aad).update(data, ENCODING),
-                          meta: aad
-                        })})
+        const cipher = crypto.createCipheriv(ALGORITHMS.authCrypto, dataKey.Plaintext, nonce).setAAD(aad);
+        const authValue = cipher.update(data, ENCODING);
+        cipher.final(ENCODING);
+        return Promise.resolve({
+          key: dataKey.CiphertextBlob,
+          value: crypto.createCipheriv(ALGORITHMS.crypto, dataKey.Plaintext, STATIC_IV).update(data, ENCODING),
+          authValue: Buffer.concat([authValue, cipher.getAuthTag()]),
+          meta: aad
+        }
+      )})
       .then((keyAndValue) =>
         Promise.all([
           writeObject(createKeyRequestObject(bucketName, name), keyAndValue.key),
