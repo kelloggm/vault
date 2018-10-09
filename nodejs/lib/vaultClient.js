@@ -77,7 +77,14 @@ const createVaultClient = (options) => {
         const authTag = keyValueAndMeta[1].Body.slice(-16);
         const meta = keyValueAndMeta[2];
         const decipher = createDecipher(meta, decryptedKey).setAuthTag(authTag);
-        return Promise.resolve(decipher.update(encryptedValue, null, ENCODING));
+        const value = decipher.update(encryptedValue, null, ENCODING);
+
+        try {
+          decipher.final(ENCODING);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+        return Promise.resolve(value);
       }),
 
     store: (name, data) => ensureCredentials()
