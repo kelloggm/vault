@@ -56,14 +56,14 @@ const createVaultClient = (options) => {
 
   return {
     lookup: (name) => ensureCredentials()
-      .then(() => {
+      .then(() =>
         Promise.all([
           s3.getObject(createKeyRequestObject(bucketName, name)).promise()
             .then((encryptedKey) => kms.decrypt({ CiphertextBlob: encryptedKey.Body }).promise()),
           s3.getObject(createAuthEncryptedValueRequestObject(bucketName, name)).promise() 
-            .catch((e) => s3.getObject(createEncryptedValueRequestObject(bucketName, name).promise())),
+            .catch(e => s3.getObject(createEncryptedValueRequestObject(bucketName, name)).promise()),
           s3.getObject(createMetaRequestObject(bucketName, name)).promise().catch(e => "nometa")
-        ])}
+        ])
       )
       .then((keyAndValue) => {
         const decryptedKey = keyAndValue[0].Plaintext;
