@@ -3,7 +3,7 @@ const sinon = require('sinon');
 require('should');
 require('should-sinon');
 const VaultClient = require('../lib/vaultClient');
-const crypto = require("crypto");
+const crypto = require('crypto');
 
 const VAULT_KEY_FIXTURE = 'vaultKey';
 const BUCKET_NAME_FIXTURE = 'bucket';
@@ -30,7 +30,7 @@ describe('VaultClient', () => {
     AWS.mock('S3', 'deleteObject', deleteObjectSpy);
     AWS.mock('KMS', 'decrypt', decryptSpy);
     AWS.mock('KMS', 'generateDataKey', generateDataKeySpy);
-    AWS.mock('CredentialProviderChain', 'resolve', resolveStub)
+    AWS.mock('CredentialProviderChain', 'resolve', resolveStub);
   });
 
   beforeEach(() => {
@@ -56,7 +56,16 @@ describe('VaultClient', () => {
         .onCall(0)
         .yields(null, { Body: ENCRYPTED_KEY_FIXTURE })
         .onCall(1)
-        .yields(null, { Body: 'foo' });
+        .yields(null, { Body: Buffer.concat([new Buffer('foo'), crypto.randomBytes(16)]) })
+        .onCall(2)
+        .yields(null, {
+          Body: Buffer.from(
+            JSON.stringify({
+              alg: 'AESGCM',
+              nonce: crypto.randomBytes(12).toString('base64')
+            })
+          )
+        });
 
       decryptSpy.yields(null, {
         Plaintext: crypto.randomBytes(32)
@@ -68,20 +77,45 @@ describe('VaultClient', () => {
       decryptSpy.reset();
     });
 
-    it('reads encrypted value from S3', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
-      .then(() => getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.encrypted' })));
+    it('reads GCM encrypted value from S3', () =>
+      vaultClient.lookup(SECRET_NAME_FIXTURE).then(() =>
+        getObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.aesgcm.encrypted'
+        })
+      ));
 
-    it('reads encrypted key from S3', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
-      .then(() => getObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + '.key' })));
+    it('reads encrypted key from S3', () =>
+      vaultClient.lookup(SECRET_NAME_FIXTURE).then(() =>
+        getObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.key'
+        })
+      ));
 
-    it('reads encrypted key and value from the correct bucket', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
-      .then(() => getObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE })));
+    it('reads meta value from S3', () =>
+      vaultClient.lookup(SECRET_NAME_FIXTURE).then(() =>
+        getObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.meta'
+        })
+      ));
 
-    it('decrypts the encrypted key using KMS', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
-      .then(() => decryptSpy.should.have.been.calledWithMatch({ CiphertextBlob: ENCRYPTED_KEY_FIXTURE })));
+    it('reads encrypted key and value from the correct bucket', () =>
+      vaultClient.lookup(SECRET_NAME_FIXTURE).then(() =>
+        getObjectSpy.should.have.been.alwaysCalledWithMatch({
+          Bucket: BUCKET_NAME_FIXTURE
+        })
+      ));
 
-    it('resolves to a string promise', () => vaultClient.lookup(SECRET_NAME_FIXTURE)
-      .then((result) => result.should.be.a.String()));
+    it('decrypts the encrypted key using KMS', () =>
+      vaultClient.lookup(SECRET_NAME_FIXTURE).then(() =>
+        decryptSpy.should.have.been.calledWithMatch({
+          CiphertextBlob: ENCRYPTED_KEY_FIXTURE
+        })
+      ));
+
+    it('resolves to a string promise', () =>
+      vaultClient
+        .lookup(SECRET_NAME_FIXTURE)
+        .then(result => result.should.be.a.String()));
   });
 
   describe('store', () => {
@@ -94,28 +128,50 @@ describe('VaultClient', () => {
       });
     });
 
-    it('Writes encrypted value to S3', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-      .then(() => putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".encrypted" })));
+    it('Writes encrypted value to S3', () =>
+      vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE).then(() =>
+        putObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.encrypted'
+        })
+      ));
 
-    it('Writes encryption key to S3', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-      .then(() => putObjectSpy.should.have.been.calledWithMatch({ Key: SECRET_NAME_FIXTURE + ".key" })));
+    it('Writes GCM encrypted value to S3', () =>
+      vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE).then(() =>
+        putObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.aesgcm.encrypted'
+        })
+      ));
 
-    it('Writes key and value to correct bucket', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-      .then(() => putObjectSpy.should.have.been.alwaysCalledWithMatch({ Bucket: BUCKET_NAME_FIXTURE })));
+    it('Writes encryption key to S3', () =>
+      vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE).then(() =>
+        putObjectSpy.should.have.been.calledWithMatch({
+          Key: SECRET_NAME_FIXTURE + '.key'
+        })
+      ));
 
-    it('Encrypts value using the correct vault key', () => vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE)
-      .then(() => generateDataKeySpy.should.have.been.calledWithMatch({ KeyId: VAULT_KEY_FIXTURE })));
+    it('Writes key and value to correct bucket', () =>
+      vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE).then(() =>
+        putObjectSpy.should.have.been.alwaysCalledWithMatch({
+          Bucket: BUCKET_NAME_FIXTURE
+        })
+      ));
+
+    it('Encrypts value using the correct vault key', () =>
+      vaultClient.store(SECRET_NAME_FIXTURE, DATA_FIXTURE).then(() =>
+        generateDataKeySpy.should.have.been.calledWithMatch({
+          KeyId: VAULT_KEY_FIXTURE
+        })
+      ));
   });
 
   describe('exists', () => {
-    describe('when object exists' , () => {
+    describe('when object exists', () => {
       beforeEach(() => headObjectSpy.yields(null, {}));
 
       it('resolves to true', () => {
-        return vaultClient.exists(SECRET_NAME_FIXTURE)
-          .then((exists) => {
-            exists.should.be.true();
-          });
+        return vaultClient.exists(SECRET_NAME_FIXTURE).then(exists => {
+          exists.should.be.true();
+        });
       });
     });
 
@@ -123,40 +179,44 @@ describe('VaultClient', () => {
       beforeEach(() => headObjectSpy.yields({}));
 
       it('resolves to false', () => {
-        return vaultClient.exists(SECRET_NAME_FIXTURE)
-          .then((exists) => {
-            exists.should.be.false();
-          });
+        return vaultClient.exists(SECRET_NAME_FIXTURE).then(exists => {
+          exists.should.be.false();
+        });
       });
     });
   });
 
   describe('all', () => {
     beforeEach(() => {
-      listObjectsSpy.yields(null, { Contents: [
-        {
-          Key: 'first.encrypted'
-        },
-        {
-          Key: 'second.key'
-        },
-        {
-          Key: 'second.encrypted'
-        },
-        {
-          Key: 'first.key'
-        }
-      ]});
+      listObjectsSpy.yields(null, {
+        Contents: [
+          {
+            Key: 'first.encrypted'
+          },
+          {
+            Key: 'second.key'
+          },
+          {
+            Key: 'second.encrypted'
+          },
+          {
+            Key: 'first.key'
+          }
+        ]
+      });
     });
 
-    it('resolves to an Array of names', () => vaultClient.all().then(all => all.should.be.an.Array()));
+    it('resolves to an Array of names', () =>
+      vaultClient.all().then(all => all.should.be.an.Array()));
 
-    it('resolves to an Array of correct size', () => vaultClient.all().then(all => all.should.have.property('length', 2)));
+    it('resolves to an Array of correct size', () =>
+      vaultClient.all().then(all => all.should.have.property('length', 2)));
 
-    it('resolves to an Array with correct names', () => vaultClient.all().then(all => {
-      all.should.containEql('first');
-      all.should.containEql('second');
-    }))
+    it('resolves to an Array with correct names', () =>
+      vaultClient.all().then(all => {
+        all.should.containEql('first');
+        all.should.containEql('second');
+      }));
   });
 
   describe('delete', () => {
@@ -164,19 +224,25 @@ describe('VaultClient', () => {
       deleteObjectSpy.yields(null, {});
     });
 
-    it('deletes the encrypted value from S3', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
-      .then(() => deleteObjectSpy.should.have.been.calledWithMatch({
-        Key: ENCRYPTED_KEY_FIXTURE + '.encrypted'
-      })));
+    it('deletes the encrypted value from S3', () =>
+      vaultClient.delete(ENCRYPTED_KEY_FIXTURE).then(() =>
+        deleteObjectSpy.should.have.been.calledWithMatch({
+          Key: ENCRYPTED_KEY_FIXTURE + '.encrypted'
+        })
+      ));
 
-    it('deletes the key from S3', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
-      .then(() => deleteObjectSpy.should.have.been.calledWithMatch({
-        Key: ENCRYPTED_KEY_FIXTURE + '.key'
-      })));
+    it('deletes the key from S3', () =>
+      vaultClient.delete(ENCRYPTED_KEY_FIXTURE).then(() =>
+        deleteObjectSpy.should.have.been.calledWithMatch({
+          Key: ENCRYPTED_KEY_FIXTURE + '.key'
+        })
+      ));
 
-    it('deletes the value and the key from the correct bucket', () => vaultClient.delete(ENCRYPTED_KEY_FIXTURE)
-      .then(() => deleteObjectSpy.should.have.been.alwaysCalledWithMatch({
-        Bucket: BUCKET_NAME_FIXTURE
-      })));
+    it('deletes the value and the key from the correct bucket', () =>
+      vaultClient.delete(ENCRYPTED_KEY_FIXTURE).then(() =>
+        deleteObjectSpy.should.have.been.alwaysCalledWithMatch({
+          Bucket: BUCKET_NAME_FIXTURE
+        })
+      ));
   });
 });
