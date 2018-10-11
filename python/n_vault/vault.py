@@ -74,7 +74,7 @@ class Vault(object):
         ret['datakey'] = key_dict['CiphertextBlob']
         aesgcm_cipher = AESGCM(data_key)
         nonce = os.urandom(12)
-        meta = json.dumps({"alg": "AESGCM", "nonce": b64encode(nonce).decode()}).encode()
+        meta = json.dumps({"alg": "AESGCM", "nonce": b64encode(nonce).decode()}, separators=(',',':'), sort_keys=True).encode()
         ret['aes-gcm-ciphertext'] = aesgcm_cipher.encrypt(nonce, data.encode(), meta)
         cipher = _get_cipher(data_key)
         encryptor = cipher.encryptor()
@@ -84,6 +84,7 @@ class Vault(object):
 
     def _decrypt(self, data_key, encrypted):
         decrypted_key = self.direct_decrypt(data_key)
+        print decrypted_key
         cipher = _get_cipher(decrypted_key)
         decryptor = cipher.decryptor()
         return decryptor.update(encrypted) + decryptor.finalize()
