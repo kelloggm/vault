@@ -84,7 +84,6 @@ class Vault(object):
 
     def _decrypt(self, data_key, encrypted):
         decrypted_key = self.direct_decrypt(data_key)
-        print decrypted_key
         cipher = _get_cipher(decrypted_key)
         decryptor = cipher.decryptor()
         return decryptor.update(encrypted) + decryptor.finalize()
