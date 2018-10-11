@@ -7,7 +7,7 @@ Command line tools and libraries for encrypting keys and values using client-sid
 
 Initialize vault bucket and other infrastructure: `vault --init`. Will create a CloudFormation stack.
 
-Encrypt a file and store in vault bucket: `vault -f <file>`
+Encrypt a file and store in vault bucket: `vault -s my-key -f <file>`
 
 Decrypt a file: `vault -l <file>`
 
