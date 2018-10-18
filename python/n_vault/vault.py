@@ -24,6 +24,12 @@ from cryptography.hazmat.primitives.ciphers.modes import CTR
 from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.backends import default_backend
 
+def _to_bytes(data):
+    encode_method = getattr(data, "encode", None)
+    if callable(encode_method):
+        return data.ebcode()
+    return data
+
 class Vault(object):
     _session = boto3.Session()
     _kms = ""
@@ -75,10 +81,10 @@ class Vault(object):
         aesgcm_cipher = AESGCM(data_key)
         nonce = os.urandom(12)
         meta = json.dumps({"alg": "AESGCM", "nonce": b64encode(nonce).decode()}, separators=(',',':'), sort_keys=True).encode()
-        ret['aes-gcm-ciphertext'] = aesgcm_cipher.encrypt(nonce, data.encode(), meta)
+        ret['aes-gcm-ciphertext'] = aesgcm_cipher.encrypt(nonce, _to_bytes(data), meta)
         cipher = _get_cipher(data_key)
         encryptor = cipher.encryptor()
-        ret['ciphertext'] = encryptor.update(data.encode()) + encryptor.finalize()
+        ret['ciphertext'] = encryptor.update(_to_bytes(data)) + encryptor.finalize()
         ret['meta'] = meta
         return ret
 
@@ -128,7 +134,7 @@ class Vault(object):
                                          Key=self._prefix + name + '.aesgcm.encrypted')['Body'].read()
             meta_add = meta
             if not isinstance(meta, bytes):
-                meta_add = meta.encode()
+                meta_add = _to_bytes(meta)
             meta = json.loads(meta)
             return AESGCM(self.direct_decrypt(datakey)).decrypt(b64decode(meta['nonce']), ciphertext, meta_add)
         except ClientError as e:
