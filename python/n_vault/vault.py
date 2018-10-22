@@ -27,7 +27,7 @@ from cryptography.hazmat.backends import default_backend
 def _to_bytes(data):
     encode_method = getattr(data, "encode", None)
     if callable(encode_method):
-        return data.ebcode()
+        return data.encode()
     return data
 
 class Vault(object):
