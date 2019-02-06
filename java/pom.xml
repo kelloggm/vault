@@ -13,6 +13,30 @@
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
+	  <compilerArguments>
+	    <Astubs>/Users/kelloggm/Research/compliance-ws/aws-kms-compliance-checker/OtherJavaCrypto.astub</Astubs>
+	  </compilerArguments>
+	  <annotationProcessorPaths>
+	    <path>
+	      <groupId>org.checkerframework</groupId>
+	      <artifactId>checker</artifactId>
+	      <version>2.5.8</version>
+	    </path>
+	    <path>
+	      <groupId>com.amazonaws</groupId>
+	      <artifactId>kms-compliance-checker</artifactId>
+	      <version>1.0</version>
+	    </path>
+	    <path>
+	      <groupId>org.checkerframework</groupId>
+	      <artifactId>checker-qual</artifactId>
+	      <version>2.5.8</version>
+	    </path>
+	  </annotationProcessorPaths>
+	  <annotationProcessors>
+	    <!-- Add all the checkers you want to enable here -->
+	    <annotationProcessor>com.amazon.checkerframework.compliance.kms.ComplianceChecker</annotationProcessor>
+	  </annotationProcessors>
         </configuration>
       </plugin>
     </plugins>
@@ -55,6 +79,23 @@
       <artifactId>commons-io</artifactId>
       <version>2.5</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>kms-compliance-checker</artifactId>
+      <version>1.0</version>
+      <scope>system</scope>
+      <systemPath>/Users/kelloggm/Research/compliance-ws/aws-kms-compliance-checker/build/libs/aws-kms-compliance-checker.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <version>2.5.8</version>
+    </dependency>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker</artifactId>
+      <version>2.5.8</version>
     </dependency>
   </dependencies>
 </project>
